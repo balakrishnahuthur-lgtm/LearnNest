@@ -2,6 +2,14 @@ import { precacheAndRoute } from 'workbox-precaching';
 
 precacheAndRoute(self.__WB_MANIFEST || []);
 
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('message', (event) => {
   if (!event.data || event.data.type !== 'schedule-return-notification') return;
 
@@ -14,7 +22,7 @@ self.addEventListener('message', (event) => {
       body,
       vibrate: [200, 100, 200],
       requireInteraction: true,
-      tag: 'return-reminder'
+      tag: `return-reminder-${Date.now()}`
     });
   };
 

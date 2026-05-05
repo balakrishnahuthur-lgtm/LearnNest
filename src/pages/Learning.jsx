@@ -21,7 +21,7 @@ const POLL_MS = 1_500;
 export default function Learning() {
   const { topicId } = useParams();
   const navigate    = useNavigate();
-  const { demoMode, dynamicTopics, saveMicroTask, trackStudyTime, completeTopic, unlockTopic } = useAppContext();
+  const { profile, demoMode, dynamicTopics, saveMicroTask, trackStudyTime, completeTopic, unlockTopic } = useAppContext();
 
   const [saving, setSaving]               = useState(false);
   const [quizVisible, setQuizVisible]     = useState(false);
@@ -35,6 +35,11 @@ export default function Learning() {
   const [endQuizLoading, setEndQuizLoading]   = useState(false);
   const [endQuizQuestions, setEndQuizQuestions] = useState([]);
 
+  // Custom YouTube video state
+  const [customVideoId, setCustomVideoId] = useState('');
+  const [customUrl, setCustomUrl] = useState('');
+  const [analyzingCaptions, setAnalyzingCaptions] = useState(false);
+
   const behavioralData = useRef([]);
   const playerRef      = useRef(null);
   const quizTimerRef   = useRef(null);
@@ -45,7 +50,7 @@ export default function Learning() {
   const sessionStart   = useRef(Date.now());
   const isQuizActive   = useRef(false);
 
-  const topicsToSearch = dynamicTopics || getRoadmapForTopic('Web Dev');
+  const topicsToSearch = dynamicTopics || getRoadmapForTopic(profile?.topic || 'Web Dev');
   const topic          = topicsToSearch.find(t => t.id === topicId);
   const topicIndex     = topicsToSearch.findIndex(t => t.id === topicId);
   const nextTopic      = topicsToSearch[topicIndex + 1] || null;
@@ -200,6 +205,22 @@ export default function Learning() {
     navigate('/goodbye');
   };
 
+  const handleCustomUrlChange = (e) => {
+    const url = e.target.value;
+    setCustomUrl(url);
+    
+    // Extract video ID from YouTube URL (watch?v= or youtu.be/)
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+    if (match && match[1]) {
+      setCustomVideoId(match[1]);
+      setAnalyzingCaptions(true);
+      // Simulate AI analyzing the captions of the new video
+      setTimeout(() => {
+        setAnalyzingCaptions(false);
+      }, 2500);
+    }
+  };
+
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
@@ -215,6 +236,19 @@ export default function Learning() {
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#7c3aed' }} />
             <p style={{ color: '#a0a0a0', fontSize: '14px' }}>Generating question...</p>
+          </div>
+        </div>
+      )}
+
+      {analyzingCaptions && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+          <div className="glass-card flex flex-col items-center gap-4 p-8 rounded-2xl border border-indigo-500/30">
+            <div className="relative">
+              <Loader2 className="w-12 h-12 animate-spin text-indigo-500" />
+              <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full"></div>
+            </div>
+            <p className="text-white font-bold text-lg">AI is reading the video captions...</p>
+            <p className="text-slate-400 text-sm max-w-xs text-center">We are generating a custom quiz based on what the YouTuber says in this exact video.</p>
           </div>
         </div>
       )}
@@ -273,12 +307,24 @@ export default function Learning() {
       <div style={{ maxWidth: '480px', margin: '0 auto', width: '100%', padding: '16px' }}>
         <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1f1f1f', aspectRatio: '16/9', background: '#000' }}>
           <YouTube
-            videoId={topic.videoId}
+            videoId={customVideoId || topic.videoId}
             opts={{ height: '100%', width: '100%', playerVars: { autoplay: 0, rel: 0, modestbranding: 1, enablejsapi: 1 } }}
             style={{ width: '100%', height: '100%' }}
             onReady={e => { playerRef.current = e.target; }}
             onStateChange={onStateChange}
           />
+        </div>
+
+        <div className="mt-4 p-4 glass-card rounded-2xl border border-indigo-500/20">
+          <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 block">Use Your Own Video (Optional)</label>
+          <input 
+            type="text" 
+            value={customUrl}
+            onChange={handleCustomUrlChange}
+            placeholder="Paste YouTube link here..." 
+            className="input-field mb-2"
+          />
+          <p className="text-[11px] text-slate-500">The AI will read the captions of your pasted video to generate the quiz.</p>
         </div>
 
         <div style={{ marginTop: '12px', padding: '12px 16px', borderRadius: '12px', background: '#1a1a1a', border: '1px solid #2a2a2a' }}>

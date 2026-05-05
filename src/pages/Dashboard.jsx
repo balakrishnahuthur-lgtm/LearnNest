@@ -32,8 +32,34 @@ export default function Dashboard() {
     navigate('/onboarding');
   };
 
+  const handleEgoTrigger = () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      alert('This browser does not support desktop notifications or service workers.');
+      return;
+    }
+    Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        navigator.serviceWorker.ready.then((registration) => {
+          if (registration.active) {
+            registration.active.postMessage({
+              type: 'schedule-return-notification',
+              delay: 10,
+              title: 'LearnNest Reality Check',
+              body: 'Is that all you got, is that the courage you got?'
+            });
+            alert('Ego Alert triggered! Close or minimize your browser now. (Waiting 10s...)');
+          } else {
+            alert('Service worker not active. Please refresh the page and try again.');
+          }
+        }).catch(err => alert("SW Error: " + err.message));
+      } else {
+        alert('Notification permission is blocked! 🛑\n\nTo see the Ego Alerts, you must click the lock icon 🔒 next to the URL bar in your browser, allow Notifications, and then refresh the page.');
+      }
+    });
+  };
+
   return (
-    <div className="min-h-screen" style={{ background: '#050b18' }}>
+    <div className="min-h-screen">
       {/* ── Top Navbar ─────────────────────────────────────────── */}
       <header className="glass-navbar sticky top-0 z-40 px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
@@ -49,12 +75,12 @@ export default function Dashboard() {
           <div className="hidden sm:flex items-center gap-3">
             {streak > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#fbbf24' }}>
+                style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', color: '#fbbf24', backdropFilter: 'blur(8px)' }}>
                 <Flame className="w-3.5 h-3.5" /> {streak} day streak
               </div>
             )}
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#818cf8' }}>
+              style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.25)', color: '#c4b5fd', backdropFilter: 'blur(8px)' }}>
               <span>{level.icon}</span> {level.name} · {xp} XP
             </div>
           </div>
@@ -100,13 +126,22 @@ export default function Dashboard() {
       {/* ── Main Content ─────────────────────────────────────────── */}
       <main className="max-w-2xl mx-auto px-4 pt-6 pb-28">
         {/* Welcome line */}
-        <div className="mb-6 animate-fade-in-down">
-          <h1 className="text-2xl font-bold text-white">
-            Hi, {profile.nickname || profile.name}! {profile.avatar || '👋'}
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Your <span className="text-indigo-400 font-medium">{profile.topic}</span> journey continues. Let's crush it today.
-          </p>
+        <div className="mb-6 flex justify-between items-start animate-fade-in-down">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              Hi, {profile.nickname || profile.name}! {profile.avatar || '👋'}
+            </h1>
+            <p className="text-slate-400 text-sm mt-1">
+              Your <span className="text-indigo-400 font-medium">{profile.topic}</span> journey continues. Let's crush it today.
+            </p>
+          </div>
+          <button 
+            onClick={handleEgoTrigger}
+            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/50 rounded-xl text-red-500 font-bold text-[10px] sm:text-xs uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:shadow-[0_0_25px_rgba(239,68,68,0.5)] active:scale-95"
+            title="Click and minimize browser to receive an ego check in 10s"
+          >
+            Trigger Ego Alert
+          </button>
         </div>
 
         {/* Tab Content */}

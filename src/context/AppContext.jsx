@@ -10,7 +10,7 @@ export const AppProvider = ({ children }) => {
   });
 
   const [demoMode, setDemoMode] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('mb_demo_mode')) ?? true; } catch { return true; }
+    try { return JSON.parse(localStorage.getItem('mb_demo_mode')) ?? false; } catch { return false; }
   });
 
   const [dynamicTopics, setDynamicTopics] = useState(() => {

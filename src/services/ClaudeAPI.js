@@ -93,7 +93,7 @@ export const generateInlineQuestion = async (topicTitle, seenTopics = [], curren
 
   try {
     return await call(
-      'You are an educational AI creating inline quiz questions for a video lecture. The question MUST be directly about a specific concept from the video content provided. Make it concrete and specific — not generic.',
+      'You are an educational AI analyzing YouTube video captions. Generate inline quiz questions based on the simulated transcript of the video lecture. The question MUST be highly specific to what a YouTuber would actually say about this concept. Make it concrete and specific — not generic.',
       topicContext
     );
   } catch (e) {
@@ -222,7 +222,7 @@ export const generateQuiz = async (topicName, demoMode = false) => {
  * @param {boolean}  demoMode
  * @returns {Promise<Array<{prompt:string, answer:string, hint:string}>>}
  */
-export const generateModuleQuiz = async (topicTitle, keyTopics = [], count = 7, demoMode = false) => {
+export const generateModuleQuiz = async (topicTitle, keyTopics = [], count = 5, demoMode = false) => {
   // Demo fallback — use quizBank
   if (demoMode || !anthropic) {
     const { getQuestions } = await import('../data/quizBank.js');
@@ -236,16 +236,17 @@ export const generateModuleQuiz = async (topicTitle, keyTopics = [], count = 7, 
 
   try {
     const text = await call(
-      `You are an educational AI generating a mandatory end-of-module quiz.
+      `You are an educational AI reading YouTube video captions to generate a mandatory end-of-module quiz.
 Rules:
-- Generate exactly ${count} fill-in-the-blank questions
-- Each question MUST test a SPECIFIC concept from the provided topic list
-- Each blank is represented as _____
-- Keep answers SHORT (1-4 words max)
-- Return ONLY valid JSON array, no extra text
-Format: [{"prompt":"sentence with _____","answer":"short answer","hint":"one-line hint"}]`,
-      `Module: "${topicTitle}"\nConcepts covered:\n${topicList}\n\nGenerate ${count} fill-in-the-blank questions, one per concept from this list.`,
-      1200
+- Generate exactly ${count} questions.
+- Gradually increase the difficulty from moderate to difficult as the array progresses.
+- Mix standard conceptual fill-in-the-blanks with "fill the missing code" snippets (e.g., ____("Hello world")).
+- Each blank is represented strictly as _____.
+- Keep answers SHORT (1-4 words max, or a brief code snippet).
+- Return ONLY valid JSON array, no extra text.
+Format: [{"prompt":"sentence or code snippet with _____","answer":"short answer","hint":"one-line hint"}]`,
+      `Module: "${topicTitle}"\nConcepts covered:\n${topicList}\n\nGenerate ${count} questions of increasing difficulty, mixing code snippets and theory.`,
+      1500
     );
     const m = text.match(/\[[\s\S]*\]/);
     const parsed = JSON.parse(m ? m[0] : text);
@@ -255,6 +256,58 @@ Format: [{"prompt":"sentence with _____","answer":"short answer","hint":"one-lin
     // Fallback to quizBank
     const { getQuestions } = await import('../data/quizBank.js');
     return getQuestions(topicTitle, 'beginner', count);
+  }
+};
+
+// ── 10. Dynamic Quiz Interventions ──────────────────────────────
+export const generateDoubtIntervention = async (topicTitle, currentQuestion, demoMode = false) => {
+  if (demoMode || !anthropic) {
+    return new Promise(r => setTimeout(() => r({
+      analogy: "Think of this concept like building a house. You need a solid foundation before putting up the walls.",
+      newQuestion: { prompt: "A strong _____ is required before building walls.", answer: "foundation", hint: "base structure" }
+    }), 1000));
+  }
+  try {
+    const text = await call(
+      `You are an AI tutor. The student is struggling with a question.
+Rules:
+- Provide a simple 1-2 sentence real-world analogy to explain the concept.
+- Provide a slightly easier, alternative fill-in-the-blank question to test the concept.
+- CRITICAL: The 'newQuestion' MUST be about the programming topic itself, NOT about the analogy! If your analogy is about a building, do NOT ask a question about a building. Ask about the code/concept.
+- Return ONLY valid JSON: {"analogy":"...","newQuestion":{"prompt":"..._____...","answer":"...","hint":"..."}}`,
+      `Module: ${topicTitle}\nStruggling Question: ${currentQuestion}\nHelp them understand and give a new question.`
+    );
+    return extractJSON(text);
+  } catch (e) {
+    return {
+      analogy: "Take a deep breath! Let's try looking at it from a simpler perspective.",
+      newQuestion: { prompt: currentQuestion, answer: "try again", hint: "Think carefully" }
+    };
+  }
+};
+
+export const generateSpeedIntervention = async (topicTitle, demoMode = false) => {
+  if (demoMode || !anthropic) {
+    return new Promise(r => setTimeout(() => r({
+      message: "Boring questions? Let me challenge you to do the next one in 10 seconds. Show me what you've got.",
+      hardQuestion: { prompt: "In an advanced architecture, scaling horizontally means adding more _____ to the pool.", answer: "machines", hint: "hardware/servers" }
+    }), 1000));
+  }
+  try {
+    const text = await call(
+      `You are a strict, challenging AI tutor. The student is answering too quickly.
+Rules:
+- Give a 1-2 sentence ego-challenging message.
+- Provide a HARD, advanced fill-in-the-blank question for the topic.
+- Return ONLY valid JSON: {"message":"...","hardQuestion":{"prompt":"..._____...","answer":"...","hint":"..."}}`,
+      `Module: ${topicTitle}\nStudent is answering fast. Give them a hard challenge.`
+    );
+    return extractJSON(text);
+  } catch (e) {
+    return {
+      message: "You're fast! Let's see if you can handle this.",
+      hardQuestion: { prompt: "An advanced _____ is needed for highly complex tasks.", answer: "system", hint: "infrastructure" }
+    };
   }
 };
 

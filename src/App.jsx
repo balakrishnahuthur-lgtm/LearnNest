@@ -12,17 +12,10 @@ import Intervention from './pages/Intervention';
 import ReEntry    from './pages/ReEntry';
 import Goodbye    from './pages/Goodbye';
 import Summary    from './pages/Summary';
-
-// Root redirect
-const RootRedirect = () => {
-  const { profile, microTaskData } = useAppContext();
-  if (!profile)      return <Navigate to="/onboarding" />;
-  if (microTaskData) return <Navigate to="/reentry" />;
-  return <Navigate to="/dashboard" />;
-};
+import Splash     from './pages/Splash';
 
 const router = createBrowserRouter([
-  { path: '/',                element: <RootRedirect /> },
+  { path: '/',               element: <Splash /> },
   { path: '/onboarding',     element: <Onboarding /> },
   { path: '/dashboard',      element: <Dashboard /> },
   { path: '/roadmap',        element: <Navigate to="/dashboard" replace /> }, // legacy redirect

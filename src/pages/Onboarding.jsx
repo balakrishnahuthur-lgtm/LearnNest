@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ArrowLeft } from 'lucide-react';
 
 const TOPICS = [
   { value: 'Python',     emoji: '🐍', desc: 'Scripts, automation, data' },
@@ -41,65 +41,70 @@ export default function Onboarding() {
   const next = () => step < 4 ? setStep(s => s + 1) : handleFinish();
 
   return (
-    <div style={{ background: '#0a0a0a', minHeight: '100vh' }}>
-      <div className="page-container" style={{ justifyContent: 'center', paddingTop: '60px', paddingBottom: '40px' }}>
+    <div className="min-h-screen bg-[#030305] flex flex-col relative overflow-hidden">
+      
+      {/* Background Ambience */}
+      <div className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] bg-indigo-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-purple-600/10 blur-[100px] rounded-full pointer-events-none"></div>
+
+      <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-center px-6 py-12 relative z-10">
 
         {/* Step dots */}
-        <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', marginBottom: '40px' }}>
+        <div className="flex gap-2 justify-center mb-12">
           {[0,1,2,3,4].map(i => (
-            <div key={i} style={{
-              width: i === step ? '24px' : '8px', height: '8px', borderRadius: '999px',
-              background: i <= step ? '#7c3aed' : '#2a2a2a', transition: 'all 0.3s',
-            }} />
+            <div key={i} className={`h-2 rounded-full transition-all duration-300 ${
+              i === step ? 'w-8 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 
+              i < step ? 'w-3 bg-indigo-500/50' : 'w-2 bg-slate-800'
+            }`} />
           ))}
         </div>
 
-        <div className="animate-fade-in-up">
+        <div className="animate-fade-in-up w-full">
 
           {/* STEP 0 — Name */}
           {step === 0 && (
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', marginBottom: '8px' }}>
-                Hey there! 👋
-              </h1>
-              <p style={{ color: '#666', fontSize: '15px', marginBottom: '28px' }}>Let's set up your learning profile.</p>
-              <label style={{ display: 'block', fontSize: '13px', color: '#888', fontWeight: 500, marginBottom: '8px' }}>
-                Full Name
-              </label>
-              <input
-                autoFocus value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && canNext() && next()}
-                placeholder="e.g. Sheshadri Nayaka"
-                className="input-field" style={{ marginBottom: '24px' }}
-              />
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Hey there! 👋</h1>
+                <p className="text-slate-400 text-lg">Let's set up your LearnNest profile.</p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Full Name</label>
+                <input
+                  autoFocus 
+                  value={form.name} 
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                  onKeyDown={e => e.key === 'Enter' && canNext() && next()}
+                  placeholder="e.g. Sheshadri Nayaka"
+                  className="w-full bg-[#0a0a0f]/80 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all text-lg backdrop-blur-xl"
+                />
+              </div>
             </div>
           )}
 
           {/* STEP 1 — Bro toggle */}
           {step === 1 && (
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', marginBottom: '8px' }}>
-                Hey {form.name.split(' ')[0]}! 😄
-              </h1>
-              <p style={{ color: '#666', fontSize: '15px', marginBottom: '32px' }}>
-                Quick question:
-              </p>
-              <div className="card" style={{ marginBottom: '28px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Hey {form.name.split(' ')[0]}!</h1>
+                <p className="text-slate-400 text-lg">Quick preference before we continue.</p>
+              </div>
+              
+              <div className="glass-card p-6 rounded-3xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+                <div className="flex items-center justify-between">
                   <div>
-                    <div style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '16px' }}>Can I call you "bro"?</div>
-                    <div style={{ color: '#666', fontSize: '13px', marginTop: '4px' }}>
+                    <div className="text-white font-bold text-lg">Can I call you "bro"?</div>
+                    <div className="text-indigo-300 text-sm mt-1">
                       {form.bro ? '✅ I\'ll call you bro!' : `I'll call you "${form.name.split(' ')[0]}"`}
                     </div>
                   </div>
                   {/* Toggle */}
-                  <div
-                    className={`toggle-track ${form.bro ? 'on' : ''}`}
+                  <button
+                    className={`relative w-14 h-8 rounded-full transition-colors duration-300 ${form.bro ? 'bg-indigo-500' : 'bg-slate-700'}`}
                     onClick={() => setForm({ ...form, bro: !form.bro })}
-                    style={{ flexShrink: 0 }}
                   >
-                    <div className="toggle-thumb" />
-                  </div>
+                    <div className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white transition-transform duration-300 ${form.bro ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
                 </div>
               </div>
             </div>
@@ -107,27 +112,32 @@ export default function Onboarding() {
 
           {/* STEP 2 — Topic */}
           {step === 2 && (
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', marginBottom: '8px' }}>
-                What do you want to learn?
-              </h1>
-              <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px' }}>Pick your learning track.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Your Track</h1>
+                <p className="text-slate-400 text-lg">What do you want to master?</p>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {TOPICS.map(t => (
-                  <button key={t.value} onClick={() => setForm({ ...form, topic: t.value })}
-                    style={{
-                      background: form.topic === t.value ? 'rgba(124,58,237,0.15)' : '#1a1a1a',
-                      border: `1.5px solid ${form.topic === t.value ? '#7c3aed' : '#2a2a2a'}`,
-                      borderRadius: '12px', padding: '14px 16px', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
-                      transition: 'all 0.15s',
-                    }}>
-                    <span style={{ fontSize: '24px' }}>{t.emoji}</span>
-                    <div>
-                      <div style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '15px' }}>{t.value}</div>
-                      <div style={{ color: '#555', fontSize: '12px' }}>{t.desc}</div>
-                    </div>
-                    {form.topic === t.value && <span style={{ marginLeft: 'auto', color: '#7c3aed', fontWeight: 700 }}>✓</span>}
+                  <button 
+                    key={t.value} 
+                    onClick={() => setForm({ ...form, topic: t.value })}
+                    className={`relative overflow-hidden text-left p-5 rounded-3xl border transition-all duration-300 ${
+                      form.topic === t.value 
+                      ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.2)]' 
+                      : 'bg-[#0a0a0f]/60 border-white/5 hover:bg-[#11111a] hover:border-white/20'
+                    } backdrop-blur-xl group`}
+                  >
+                    <div className="text-3xl mb-3">{t.emoji}</div>
+                    <div className="text-white font-bold text-lg mb-1">{t.value}</div>
+                    <div className="text-slate-500 text-xs font-medium">{t.desc}</div>
+                    
+                    {form.topic === t.value && (
+                      <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center shadow-[0_0_10px_rgba(99,102,241,0.8)]">
+                        <span className="text-white text-sm font-bold">✓</span>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -136,27 +146,34 @@ export default function Onboarding() {
 
           {/* STEP 3 — Goal */}
           {step === 3 && (
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', marginBottom: '8px' }}>
-                Why are you learning?
-              </h1>
-              <p style={{ color: '#666', fontSize: '14px', marginBottom: '24px' }}>This helps us tailor your roadmap.</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Your Goal</h1>
+                <p className="text-slate-400 text-lg">Why are you learning?</p>
+              </div>
+              
+              <div className="flex flex-col gap-4">
                 {GOALS.map(g => (
-                  <button key={g.value} onClick={() => setForm({ ...form, goal: g.value })}
-                    style={{
-                      background: form.goal === g.value ? 'rgba(124,58,237,0.15)' : '#1a1a1a',
-                      border: `1.5px solid ${form.goal === g.value ? '#7c3aed' : '#2a2a2a'}`,
-                      borderRadius: '12px', padding: '14px 16px', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
-                      transition: 'all 0.15s',
-                    }}>
-                    <span style={{ fontSize: '24px' }}>{g.emoji}</span>
-                    <div>
-                      <div style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '15px' }}>{g.value}</div>
-                      <div style={{ color: '#555', fontSize: '12px' }}>{g.desc}</div>
+                  <button 
+                    key={g.value} 
+                    onClick={() => setForm({ ...form, goal: g.value })}
+                    className={`relative overflow-hidden text-left p-5 rounded-3xl border transition-all duration-300 flex items-center gap-4 ${
+                      form.goal === g.value 
+                      ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.2)]' 
+                      : 'bg-[#0a0a0f]/60 border-white/5 hover:bg-[#11111a] hover:border-white/20'
+                    } backdrop-blur-xl group`}
+                  >
+                    <div className="text-4xl">{g.emoji}</div>
+                    <div className="flex-1">
+                      <div className="text-white font-bold text-lg">{g.value}</div>
+                      <div className="text-slate-500 text-sm font-medium">{g.desc}</div>
                     </div>
-                    {form.goal === g.value && <span style={{ marginLeft: 'auto', color: '#7c3aed', fontWeight: 700 }}>✓</span>}
+                    
+                    {form.goal === g.value && (
+                      <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center shadow-[0_0_10px_rgba(99,102,241,0.8)]">
+                        <span className="text-white text-sm font-bold">✓</span>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -165,40 +182,47 @@ export default function Onboarding() {
 
           {/* STEP 4 — Favorite game */}
           {step === 4 && (
-            <div>
-              <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', marginBottom: '8px' }}>
-                Last one! 🎮
-              </h1>
-              <p style={{ color: '#666', fontSize: '14px', marginBottom: '28px' }}>
-                What's your favorite game? We'll use this to bring you back when you've been away.
-              </p>
-              <label style={{ display: 'block', fontSize: '13px', color: '#888', marginBottom: '8px' }}>
-                Favorite Game <span style={{ color: '#444' }}>(optional)</span>
-              </label>
-              <input
-                autoFocus value={form.game}
-                onChange={e => setForm({ ...form, game: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && handleFinish()}
-                placeholder="e.g. Freefire, BGMI, Valorant, Chess..."
-                className="input-field" style={{ marginBottom: '24px' }}
-              />
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Last one! 🎮</h1>
+                <p className="text-slate-400 text-lg">What's your favorite game? We'll use this to bring you back when you slack off.</p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Favorite Game (Optional)</label>
+                <input
+                  autoFocus 
+                  value={form.game}
+                  onChange={e => setForm({ ...form, game: e.target.value })}
+                  onKeyDown={e => e.key === 'Enter' && handleFinish()}
+                  placeholder="e.g. Freefire, BGMI, Valorant..."
+                  className="w-full bg-[#0a0a0f]/80 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:shadow-[0_0_20px_rgba(99,102,241,0.2)] transition-all text-lg backdrop-blur-xl"
+                />
+              </div>
             </div>
           )}
 
-          {/* Nav button */}
-          <button onClick={next} disabled={!canNext()} className="btn-primary">
-            {step < 4
-              ? <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                  Continue <ChevronRight style={{ width: '16px', height: '16px' }} />
-                </span>
-              : '🚀 Start My Journey'}
-          </button>
-
-          {step > 0 && (
-            <button onClick={() => setStep(s => s - 1)} className="btn-secondary" style={{ marginTop: '10px' }}>
-              ← Back
+          {/* Navigation Buttons */}
+          <div className="mt-10 space-y-4">
+            <button 
+              onClick={next} 
+              disabled={!canNext()} 
+              className="w-full gradient-primary text-white font-black text-lg py-4 rounded-2xl shadow-[0_0_30px_rgba(124,58,237,0.4)] hover:shadow-[0_0_50px_rgba(124,58,237,0.6)] disabled:opacity-50 disabled:shadow-none transition-all flex items-center justify-center gap-2"
+            >
+              {step < 4 ? 'Continue' : 'Start My Journey'}
+              {step < 4 && <ChevronRight className="w-5 h-5" />}
             </button>
-          )}
+
+            {step > 0 && (
+              <button 
+                onClick={() => setStep(s => s - 1)} 
+                className="w-full py-4 text-slate-500 font-bold text-sm uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Back
+              </button>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

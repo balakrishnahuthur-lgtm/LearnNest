@@ -1,49 +1,127 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CheckCircle2, XCircle, Lightbulb, Trophy, RefreshCw, ChevronRight, Loader2, Lock } from 'lucide-react';
+import { CheckCircle2, XCircle, Lightbulb, Trophy, RefreshCw, ChevronRight, Loader2, Lock, Flame } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { generateDoubtIntervention, generateSpeedIntervention } from '../services/ClaudeAPI';
 
 const PASS_THRESHOLD = 0.6; // 60% to pass
 
 export default function EndOfModuleQuiz({ visible, questions, topicTitle, loading, onPass, onFail }) {
-  const [idx, setIdx]           = useState(0);
-  const [input, setInput]       = useState('');
+  const { demoMode } = useAppContext();
+  
+  const [activeQuestions, setActiveQuestions] = useState([]);
+  const [idx, setIdx]             = useState(0);
+  const [input, setInput]         = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
-  const [results, setResults]   = useState([]);   // {correct, answer, expected}
-  const [phase, setPhase]       = useState('quiz'); // quiz | result
+  const [results, setResults]     = useState([]);   // {correct, answer, expected}
+  const [phase, setPhase]         = useState('quiz'); // quiz | result
   const inputRef = useRef(null);
+
+  // Telemetry & Triggers
+  const questionStartTime = useRef(Date.now());
+  const backspaceCount    = useRef(0);
+  const [intervention, setIntervention] = useState(null); // { type: 'doubt'|'speed', status: 'loading'|'ready', data: any }
+  const [queueSpeedIntervention, setQueueSpeedIntervention] = useState(false);
+  const [hardModeTimeLeft, setHardModeTimeLeft] = useState(null);
+
+  // Initialize questions
+  useEffect(() => {
+    if (questions && questions.length > 0) {
+      setActiveQuestions(questions.map(q => ({ ...q })));
+    }
+  }, [questions]);
 
   // Reset when opened
   useEffect(() => {
-    if (visible) {
+    if (visible && activeQuestions.length > 0) {
       setIdx(0); setInput(''); setSubmitted(false);
-      setResults([]); setPhase('quiz');
+      setResults([]); setPhase('quiz'); setIntervention(null);
+      setQueueSpeedIntervention(false); setHardModeTimeLeft(null);
+      questionStartTime.current = Date.now();
+      backspaceCount.current = 0;
       setTimeout(() => inputRef.current?.focus(), 300);
     }
-  }, [visible]);
+  }, [visible, activeQuestions.length]);
 
+  // Reset on index change
   useEffect(() => {
-    if (phase === 'quiz' && !submitted) {
+    if (phase === 'quiz' && !submitted && !intervention) {
       setInput(''); setSubmitted(false);
+      setQueueSpeedIntervention(false);
+      questionStartTime.current = Date.now();
+      backspaceCount.current = 0;
+      
+      const q = activeQuestions[idx];
+      if (q?.isHardMode) {
+        setHardModeTimeLeft(10);
+      } else {
+        setHardModeTimeLeft(null);
+      }
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [idx]);
+  }, [idx, phase, submitted, intervention, activeQuestions]);
+
+  // Telemetry monitoring loop & Hard Mode Countdown
+  useEffect(() => {
+    if (!visible || phase !== 'quiz' || submitted || intervention || activeQuestions.length === 0) return;
+
+    const interval = setInterval(() => {
+      const q = activeQuestions[idx];
+      
+      // Hard Mode Countdown Logic
+      if (q?.isHardMode && hardModeTimeLeft !== null) {
+        setHardModeTimeLeft(prev => {
+          if (prev <= 1) {
+            handleTimeOut();
+            return 0;
+          }
+          return prev - 1;
+        });
+        return;
+      }
+
+      // Doubt Trigger Logic (only for normal questions)
+      if (!q?.isHardMode) {
+        const promptText = q?.prompt || q?.question || '';
+        const wordCount = promptText.trim().split(/\s+/).length;
+        // 500ms reading time per word + 5000ms cognitive buffer. Min 10s, Max 30s.
+        const dynamicThreshold = Math.max(10000, Math.min(30000, (wordCount * 500) + 5000));
+        
+        const timeSpent = Date.now() - questionStartTime.current;
+        // console.log(`[Quiz Timer] words: ${wordCount} | threshold: ${dynamicThreshold}ms | timeSpent: ${timeSpent}ms`);
+        if (timeSpent > dynamicThreshold && !intervention) {
+          // console.log('[Quiz Timer] Threshold reached! Firing doubt intervention...');
+          triggerDoubtIntervention();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [visible, phase, submitted, intervention, idx, activeQuestions, hardModeTimeLeft]);
 
   if (!visible) return null;
 
   // ── Loading state ─────────────────────────────────────────────
-  if (loading || !questions || questions.length === 0) {
+  if (loading || activeQuestions.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: '#0a0a0a' }}>
-        <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#7c3aed' }} />
-        <p style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '16px' }}>Building your module quiz…</p>
-        <p style={{ color: '#555', fontSize: '13px', marginTop: '6px' }}>Analysing everything covered in this video</p>
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a]">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
+        <p className="text-white font-bold text-lg">Building your module quiz…</p>
+        <p className="text-slate-400 text-sm mt-1">Analyzing video captions...</p>
       </div>
     );
   }
 
-  const q         = questions[idx];
-  const total     = questions.length;
-  const pct       = Math.round((idx / total) * 100);
+  const q     = activeQuestions[idx];
+  const total = activeQuestions.length;
+
+  // ── Actions ───────────────────────────────────────────────────
+  const triggerDoubtIntervention = async () => {
+    setIntervention({ type: 'doubt', status: 'loading' });
+    const promptText = q.prompt || q.question || '';
+    const res = await generateDoubtIntervention(topicTitle, promptText, demoMode);
+    setIntervention({ type: 'doubt', status: 'ready', data: res });
+  };
 
   const checkAnswer = (userInput) => {
     const norm = (s) => s.trim().toLowerCase().replace(/[<>()]/g, '').replace(/\s+/g, ' ');
@@ -51,15 +129,47 @@ export default function EndOfModuleQuiz({ visible, questions, topicTitle, loadin
     return accepted.some(a => norm(userInput) === norm(a));
   };
 
+  const handleTimeOut = () => {
+    if (submitted) return;
+    setIsCorrect(false);
+    setSubmitted(true);
+    setResults(prev => [...prev, { correct: false, answer: 'TIME OUT', expected: q.answer }]);
+  };
+
   const handleSubmit = () => {
-    if (!input.trim() || submitted) return;
+    if (!input.trim() || submitted || intervention) return;
+    
     const correct = checkAnswer(input);
+    const timeSpent = Date.now() - questionStartTime.current;
+
     setIsCorrect(correct);
     setSubmitted(true);
     setResults(prev => [...prev, { correct, answer: input, expected: q.answer }]);
+
+    // Speed Trigger Logic
+    if (correct && timeSpent < 5000 && !q.isHardMode && idx < total - 1) {
+      setQueueSpeedIntervention(true);
+    }
   };
 
-  const handleNext = () => {
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && input.trim()) handleSubmit();
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      backspaceCount.current += 1;
+      if (backspaceCount.current >= 5 && !submitted && !intervention && !q.isHardMode) {
+        triggerDoubtIntervention();
+      }
+    }
+  };
+
+  const handleNext = async () => {
+    if (queueSpeedIntervention) {
+      setIntervention({ type: 'speed', status: 'loading' });
+      const res = await generateSpeedIntervention(topicTitle, demoMode);
+      setIntervention({ type: 'speed', status: 'ready', data: res });
+      return;
+    }
+
     if (idx < total - 1) {
       setIdx(i => i + 1);
       setSubmitted(false);
@@ -68,9 +178,41 @@ export default function EndOfModuleQuiz({ visible, questions, topicTitle, loadin
     }
   };
 
+  const applyDoubtIntervention = () => {
+    // Swap current question with the easier new question
+    const updated = [...activeQuestions];
+    updated[idx] = { 
+      ...intervention.data.newQuestion, 
+      prompt: intervention.data.newQuestion.prompt || intervention.data.newQuestion.question 
+    };
+    setActiveQuestions(updated);
+    setIntervention(null);
+    setInput('');
+    questionStartTime.current = Date.now();
+    backspaceCount.current = 0;
+  };
+
+  const applySpeedIntervention = () => {
+    // Inject the hard question into the next slot
+    const updated = [...activeQuestions];
+    updated[idx + 1] = { 
+      ...intervention.data.hardQuestion, 
+      prompt: intervention.data.hardQuestion.prompt || intervention.data.hardQuestion.question,
+      isHardMode: true 
+    };
+    setActiveQuestions(updated);
+    setIntervention(null);
+    setQueueSpeedIntervention(false);
+    setIdx(i => i + 1);
+    setSubmitted(false);
+  };
+
   const handleRetry = () => {
+    // Reset back to original questions for a fair retry
+    setActiveQuestions(questions.map(orig => ({ ...orig })));
     setIdx(0); setInput(''); setSubmitted(false);
-    setResults([]); setPhase('quiz');
+    setResults([]); setPhase('quiz'); setIntervention(null);
+    setQueueSpeedIntervention(false); setHardModeTimeLeft(null);
   };
 
   // ── Results screen ────────────────────────────────────────────
@@ -80,92 +222,74 @@ export default function EndOfModuleQuiz({ visible, questions, topicTitle, loadin
     const passed       = correctCount / total >= PASS_THRESHOLD;
 
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#0a0a0a' }}>
-        <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 20px' }}>
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-            <div style={{ fontSize: '52px', marginBottom: '12px' }}>{passed ? '🏆' : '📖'}</div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#f0f0f0', marginBottom: '6px' }}>
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-[#0a0a0a]">
+        <div className="max-w-lg mx-auto py-10 px-5">
+          <div className="text-center mb-8">
+            <div className="text-6xl mb-3">{passed ? '🏆' : '📖'}</div>
+            <h1 className="text-2xl font-bold text-white mb-2">
               {passed ? 'Module Complete!' : 'Not Quite Yet'}
             </h1>
-            <p style={{ color: '#666', fontSize: '14px' }}>
-              {topicTitle}
-            </p>
+            <p className="text-slate-400">{topicTitle}</p>
           </div>
 
-          {/* Score ring */}
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <div style={{
-              display: 'inline-flex', flexDirection: 'column', alignItems: 'center',
-              padding: '24px 40px', borderRadius: '20px',
-              background: passed ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-              border: `1px solid ${passed ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-            }}>
-              <div style={{ fontSize: '48px', fontWeight: 800, color: passed ? '#10b981' : '#f87171' }}>
+          <div className="flex justify-center mb-8">
+            <div className={`flex flex-col items-center py-6 px-10 rounded-3xl border backdrop-blur-md ${
+              passed ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'
+            }`}>
+              <div className={`text-5xl font-black ${passed ? 'text-emerald-400' : 'text-red-400'}`}>
                 {score}%
               </div>
-              <div style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
+              <div className="text-slate-400 text-sm mt-2 font-medium">
                 {correctCount} of {total} correct
               </div>
             </div>
           </div>
 
-          {/* Question-by-question breakdown */}
-          <div style={{ marginBottom: '24px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
-              Answer Breakdown
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {questions.map((q, i) => {
-                const r = results[i];
-                return (
-                  <div key={i} style={{
-                    padding: '10px 14px', borderRadius: '10px',
-                    background: r?.correct ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
-                    border: `1px solid ${r?.correct ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                    display: 'flex', alignItems: 'flex-start', gap: '10px',
-                  }}>
-                    <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>
-                      {r?.correct ? '✅' : '❌'}
-                    </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ color: '#ccc', fontSize: '12px', lineHeight: '1.4' }}>
-                        {q.prompt?.replace('_____', `[${q.answer}]`) || q.question}
-                      </div>
-                      {!r?.correct && r?.answer && (
-                        <div style={{ color: '#f87171', fontSize: '11px', marginTop: '3px' }}>
-                          Your answer: "{r.answer}" · Correct: "{q.answer}"
-                        </div>
-                      )}
+          <div className="space-y-2 mb-8">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Answer Breakdown</h3>
+            {activeQuestions.map((q, i) => {
+              const r = results[i];
+              return (
+                <div key={i} className={`p-4 rounded-xl border flex gap-3 ${
+                  r?.correct ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'
+                }`}>
+                  <span className="text-lg flex-shrink-0">{r?.correct ? '✅' : '❌'}</span>
+                  <div className="min-w-0">
+                    <div className="text-slate-300 text-sm leading-relaxed">
+                      {(q.prompt || q.question || '').replace('_____', `[${q.answer}]`)}
                     </div>
+                    {!r?.correct && r?.answer && (
+                      <div className="text-red-400 text-xs mt-2 font-medium">
+                        Your answer: "{r.answer}" · Correct: "{q.answer}"
+                      </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* CTAs */}
-          {passed ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={onPass} className="btn-primary" style={{ fontSize: '16px', padding: '16px' }}>
+          <div className="flex flex-col gap-3">
+            {passed ? (
+              <button onClick={onPass} className="w-full py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-lg transition-all shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                 🔓 Unlock Next Module
               </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ padding: '12px 16px', borderRadius: '12px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', marginBottom: '4px' }}>
-                <p style={{ color: '#fbbf24', fontSize: '13px', lineHeight: '1.5' }}>
-                  You need <strong>{Math.ceil(PASS_THRESHOLD * total)}/{total}</strong> to pass. Watch the video again and try once more!
-                </p>
-              </div>
-              <button onClick={handleRetry} className="btn-primary">
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  <RefreshCw style={{ width: '15px', height: '15px' }} /> Try Again
-                </span>
-              </button>
-              <button onClick={onFail} className="btn-secondary">Go Back to Video</button>
-            </div>
-          )}
+            ) : (
+              <>
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center mb-2">
+                  <p className="text-amber-400 text-sm">
+                    You need <strong>{Math.ceil(PASS_THRESHOLD * total)}/{total}</strong> to pass.
+                  </p>
+                </div>
+                <button onClick={handleRetry} className="w-full py-4 rounded-2xl gradient-primary text-white font-bold transition-all flex justify-center items-center gap-2">
+                  <RefreshCw className="w-5 h-5" /> Try Again
+                </button>
+                <button onClick={onFail} className="w-full py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-all">
+                  Go Back to Video
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -173,55 +297,49 @@ export default function EndOfModuleQuiz({ visible, questions, topicTitle, loadin
 
   // ── Quiz screen ───────────────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0a0a0a' }}>
+    <div className="fixed inset-0 z-40 flex flex-col bg-[#030305] overflow-hidden">
 
       {/* Top progress */}
-      <div style={{ background: '#111', borderBottom: '1px solid #1f1f1f', padding: '12px 20px' }}>
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div className="bg-[#0a0a0f] border-b border-white/5 py-4 px-5 shrink-0 z-10">
+        <div className="max-w-lg mx-auto">
+          <div className="flex justify-between items-center mb-3">
             <div>
-              <div style={{ color: '#7c3aed', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                🎓 Module Quiz
-              </div>
-              <div style={{ color: '#888', fontSize: '12px', marginTop: '2px' }}>{topicTitle}</div>
+              <div className="text-indigo-400 text-xs font-bold uppercase tracking-widest">🎓 Module Quiz</div>
+              <div className="text-slate-400 text-sm mt-1">{topicTitle}</div>
             </div>
-            <span style={{
-              background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(124,58,237,0.25)',
-              borderRadius: '999px', padding: '4px 12px', color: '#a78bfa', fontSize: '12px', fontWeight: 600,
-            }}>
+            <span className="bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold shadow-[0_0_10px_rgba(99,102,241,0.2)]">
               {idx + 1} / {total}
             </span>
           </div>
-          {/* Progress bar */}
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${((idx + (submitted ? 1 : 0)) / total) * 100}%` }} />
-          </div>
-          {/* Correct tally */}
-          <div style={{ display: 'flex', gap: '4px', marginTop: '8px' }}>
-            {results.map((r, i) => (
-              <div key={i} style={{
-                width: '8px', height: '8px', borderRadius: '50%',
-                background: r.correct ? '#10b981' : '#ef4444',
-              }} />
-            ))}
+          <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 transition-all duration-300 shadow-[0_0_10px_rgba(99,102,241,0.8)]" 
+                 style={{ width: `${((idx + (submitted ? 1 : 0)) / total) * 100}%` }} />
           </div>
         </div>
       </div>
 
       {/* Question body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
-        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+      <div className="flex-1 overflow-y-auto p-5 relative">
+        <div className="max-w-lg mx-auto pt-6">
 
-          <p style={{ fontSize: '17px', fontWeight: 600, color: '#f0f0f0', lineHeight: '1.65', marginBottom: '24px' }}>
-            {(q.prompt || q.question || '').split('_____').map((part, i, arr) => (
+          {q?.isHardMode && (
+            <div className="flex items-center gap-2 text-amber-500 mb-4 animate-pulse">
+              <Flame className="w-5 h-5" />
+              <span className="font-bold uppercase tracking-widest text-sm">Challenge Mode</span>
+              {hardModeTimeLeft !== null && (
+                <span className={`ml-auto font-black text-lg ${hardModeTimeLeft <= 3 ? 'text-red-500' : 'text-amber-500'}`}>
+                  00:{hardModeTimeLeft.toString().padStart(2, '0')}
+                </span>
+              )}
+            </div>
+          )}
+
+          <p className="text-xl md:text-2xl font-bold text-white leading-relaxed mb-8">
+            {(q?.prompt || q?.question || '').split('_____').map((part, i, arr) => (
               <React.Fragment key={i}>
                 {part}
                 {i < arr.length - 1 && (
-                  <span style={{
-                    display: 'inline-block', margin: '0 4px', padding: '1px 12px',
-                    background: 'rgba(124,58,237,0.12)', border: '1px dashed rgba(124,58,237,0.5)',
-                    borderRadius: '8px', color: '#a78bfa', fontFamily: 'monospace', minWidth: '80px',
-                  }}>
+                  <span className="inline-block mx-2 px-4 py-1 bg-indigo-500/10 border border-dashed border-indigo-500/50 rounded-xl text-indigo-300 font-mono min-w-[80px]">
                     _____
                   </span>
                 )}
@@ -231,72 +349,106 @@ export default function EndOfModuleQuiz({ visible, questions, topicTitle, loadin
 
           {/* Input */}
           {!submitted ? (
-            <>
+            <div className="space-y-4">
               <input
                 ref={inputRef}
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && input.trim() && handleSubmit()}
+                onKeyDown={handleKeyDown}
                 placeholder="Type your answer..."
-                className="input-field"
-                style={{ marginBottom: '12px', fontSize: '16px' }}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:bg-indigo-500/5 transition-all text-lg shadow-[0_0_20px_rgba(0,0,0,0.5)]"
+                disabled={intervention !== null}
               />
 
-              {/* Hint */}
-              {q.hint && (
-                <div style={{
-                  display: 'flex', gap: '8px', alignItems: 'flex-start',
-                  padding: '10px 14px', borderRadius: '10px', marginBottom: '16px',
-                  background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.15)',
-                }}>
-                  <Lightbulb style={{ width: '14px', height: '14px', color: '#f59e0b', flexShrink: 0, marginTop: '1px' }} />
-                  <p style={{ color: '#d97706', fontSize: '13px' }}>{q.hint}</p>
+              {q?.hint && (
+                <div className="flex gap-3 items-start p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <Lightbulb className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-amber-400/90 text-sm">{q.hint}</p>
                 </div>
               )}
 
-              <button onClick={handleSubmit} disabled={!input.trim()} className="btn-primary">
+              <button 
+                onClick={handleSubmit} 
+                disabled={!input.trim() || intervention !== null} 
+                className="w-full py-4 rounded-2xl gradient-primary text-white font-bold text-lg disabled:opacity-50 transition-all shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)]"
+              >
                 Submit Answer
               </button>
-            </>
+            </div>
           ) : (
-            /* Result for this question */
-            <>
-              <div style={{
-                padding: '16px', borderRadius: '12px', marginBottom: '16px',
-                background: isCorrect ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-                border: `1px solid ${isCorrect ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  {isCorrect
-                    ? <CheckCircle2 style={{ width: '18px', height: '18px', color: '#10b981' }} />
-                    : <XCircle     style={{ width: '18px', height: '18px', color: '#f87171' }} />}
-                  <span style={{ fontWeight: 700, color: isCorrect ? '#10b981' : '#f87171', fontSize: '14px' }}>
+            <div className="space-y-6 animate-fade-in-up">
+              <div className={`p-5 rounded-2xl border ${isCorrect ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  {isCorrect ? <CheckCircle2 className="w-6 h-6 text-emerald-500" /> : <XCircle className="w-6 h-6 text-red-500" />}
+                  <span className={`font-bold text-lg ${isCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
                     {isCorrect ? 'Correct! 🎉' : `Answer: "${q.answer}"`}
                   </span>
                 </div>
                 {q.explanation && (
-                  <p style={{ color: '#ccc', fontSize: '13px', lineHeight: '1.55' }}>{q.explanation}</p>
+                  <p className="text-slate-300 text-sm leading-relaxed mt-2">{q.explanation}</p>
                 )}
               </div>
 
-              <button onClick={handleNext} className="btn-primary">
-                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                  {idx < total - 1 ? 'Next Question' : 'See Results'}
-                  <ChevronRight style={{ width: '16px', height: '16px' }} />
-                </span>
+              <button onClick={handleNext} className="w-full py-4 rounded-2xl gradient-primary text-white font-bold text-lg flex justify-center items-center gap-2 shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)]">
+                {idx < total - 1 ? (queueSpeedIntervention ? 'Continue...' : 'Next Question') : 'See Results'}
+                <ChevronRight className="w-5 h-5" />
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Bottom note */}
-      <div style={{ padding: '12px 20px', textAlign: 'center', borderTop: '1px solid #1a1a1a' }}>
-        <p style={{ color: '#444', fontSize: '12px' }}>
-          <Lock style={{ width: '11px', height: '11px', display: 'inline', marginRight: '4px' }} />
-          Pass {Math.ceil(PASS_THRESHOLD * total)}/{total} to unlock the next module
-        </p>
-      </div>
+      {/* ── Interventions Overlays ────────────────────────────────── */}
+      {intervention && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-5 bg-black/60 backdrop-blur-md animate-fade-in">
+          {intervention.status === 'loading' ? (
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-indigo-500 mx-auto mb-4" />
+              <p className="text-white font-bold text-lg">AI is analyzing your behavior...</p>
+            </div>
+          ) : (
+            <div className="glass-card max-w-sm w-full p-6 border-indigo-500/40 shadow-[0_0_50px_rgba(124,58,237,0.3)] animate-fade-in-up text-center relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 gradient-primary"></div>
+              
+              <div className="w-16 h-16 mx-auto bg-indigo-500/20 rounded-full flex items-center justify-center mb-4">
+                <Sparkles className="w-8 h-8 text-indigo-400" />
+              </div>
+              
+              {intervention.type === 'doubt' ? (
+                <>
+                  <h3 className="text-xl font-bold text-white mb-2">Doubt in this topic?</h3>
+                  <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                    {intervention.data.analogy}
+                  </p>
+                  <button onClick={applyDoubtIntervention} className="w-full py-3 rounded-xl gradient-primary text-white font-bold shadow-[0_0_15px_rgba(124,58,237,0.4)]">
+                    Got it, give me a new question
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-xl font-bold text-white mb-2">Too Easy?</h3>
+                  <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                    {intervention.data.message}
+                  </p>
+                  <button onClick={applySpeedIntervention} className="w-full py-3 rounded-xl bg-amber-500 text-black font-black uppercase tracking-widest shadow-[0_0_20px_rgba(245,158,11,0.5)]">
+                    Bring it on (10s limit)
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+// Just importing Sparkles here to fix the missing import error
+function Sparkles(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+      <path d="M5 3v4M3 5h4M19 3v4M17 5h4M5 19v4M3 21h4M19 19v4M17 21h4"/>
+    </svg>
   );
 }
