@@ -1,36 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import YouTube from 'react-youtube';
-import { TOPICS as PYTHON_TOPICS } from '../data/topics';
 import { useAppContext } from '../context/AppContext';
-import { generateMicroTask } from '../services/ClaudeAPI';
+import { generateInlineQuestion, generateMicroTask } from '../services/ClaudeAPI';
 import { getRoadmapForTopic } from '../data/roadmaps';
-import { getQuestions } from '../data/quizBank';
 import VideoQuizOverlay from '../components/VideoQuizOverlay';
-import { ArrowLeft, LogOut, Loader2, Brain } from 'lucide-react';
+import { ArrowLeft, LogOut, Loader2 } from 'lucide-react';
 
-// Quiz fires after this many ms of actual playback
-const QUIZ_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-const DEMO_QUIZ_INTERVAL_MS = 30 * 1000;  // 30 seconds in demo mode
+const QUIZ_INTERVAL_MS   = 90_000;  // 90 seconds of playback
+const MAX_INTERRUPTS     = 3;
 
 export default function Learning() {
   const { topicId } = useParams();
   const navigate    = useNavigate();
   const { demoMode, dynamicTopics, saveMicroTask, trackStudyTime } = useAppContext();
 
-  const [saving, setSaving]           = useState(false);
-  const [showPausePopup, setShowPausePopup] = useState(false);
-  const [quizVisible, setQuizVisible] = useState(false);
-  const [quizQuestions, setQuizQuestions] = useState([]);
-  const [difficulty, setDifficulty]   = useState('beginner');
-  const [quizRound, setQuizRound]     = useState(0);
+  const [saving, setSaving]             = useState(false);
+  const [quizVisible, setQuizVisible]   = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState('');
+  const [interruptCount, setInterruptCount]   = useState(0);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
 
-  const playerRef        = useRef(null);
-  const pauseTimerRef    = useRef(null);
-  const quizTimerRef     = useRef(null);
-  const playedMsRef      = useRef(0);       // accumulated play time
-  const playStartRef     = useRef(null);    // when playback started
-  const sessionStartRef  = useRef(Date.now());
+  // Behavioral data collected across all 3 interrupts
+  const behavioralData = useRef([]);
+
+  // Playback tracking
+  const playerRef       = useRef(null);
+  const quizTimerRef    = useRef(null);
+  const playStartRef    = useRef(null);
+  const playedMsRef     = useRef(0);
+  const sessionStart    = useRef(Date.now());
 
   const topicsToSearch = dynamicTopics || getRoadmapForTopic('Web Dev');
   const topic = topicsToSearch.find(t => t.id === topicId);
@@ -41,190 +40,156 @@ export default function Learning() {
 
   useEffect(() => {
     return () => {
-      clearTimeout(pauseTimerRef.current);
       clearTimeout(quizTimerRef.current);
     };
   }, []);
 
-  // ── Helpers ──────────────────────────────────────────────────
-  const accumulatePlaytime = () => {
+  if (!topic) return null;
+
+  // ── Playback helpers ──────────────────────────────────────────
+  const accumulatePlay = () => {
     if (playStartRef.current) {
       playedMsRef.current += Date.now() - playStartRef.current;
       playStartRef.current = null;
     }
   };
 
-  const scheduleQuiz = () => {
+  const scheduleNextQuiz = () => {
     clearTimeout(quizTimerRef.current);
-    const interval = demoMode ? DEMO_QUIZ_INTERVAL_MS : QUIZ_INTERVAL_MS;
-    const remaining = Math.max(0, interval - playedMsRef.current);
-    quizTimerRef.current = setTimeout(() => triggerQuiz(), remaining);
+    const remaining = Math.max(0, QUIZ_INTERVAL_MS - playedMsRef.current);
+    quizTimerRef.current = setTimeout(triggerQuiz, remaining);
   };
 
-  const triggerQuiz = () => {
-    // Pause video
+  const triggerQuiz = async () => {
+    accumulatePlay();
     playerRef.current?.pauseVideo();
-    // Pick questions
-    const qs = getQuestions(topic?.title || '', difficulty, 5);
-    setQuizQuestions(qs);
+    setLoadingQuestion(true);
+    const q = await generateInlineQuestion(topic.title, demoMode);
+    setCurrentQuestion(q);
+    setLoadingQuestion(false);
     setQuizVisible(true);
-    playedMsRef.current = 0; // reset for next round
+    playedMsRef.current = 0; // reset for next interval
   };
 
-  const handleQuizComplete = ({ nextDifficulty }) => {
-    setQuizRound(r => r + 1);
-    if (nextDifficulty === 'intermediate' && difficulty === 'beginner') setDifficulty('intermediate');
-    if (nextDifficulty === 'advanced' && difficulty === 'intermediate') setDifficulty('advanced');
-  };
-
-  const handleQuizResume = () => {
+  // Called when VideoQuizOverlay finishes
+  const handleQuizDone = (signals) => {
+    const newCount = interruptCount + 1;
+    behavioralData.current = [...behavioralData.current, signals];
+    setInterruptCount(newCount);
     setQuizVisible(false);
-    playerRef.current?.playVideo();
+
+    if (newCount >= MAX_INTERRUPTS) {
+      // Navigate to summary with all behavioral data
+      const allData = behavioralData.current;
+      navigate('/summary', {
+        state: {
+          topicId,
+          topicTitle: topic.title,
+          behavioralData: allData,
+          demoMode,
+          // Force OVERLOADED in demo mode (spec requirement)
+          forceDemoState: demoMode ? 'overloaded' : null,
+        }
+      });
+    } else {
+      // Resume video and schedule next quiz
+      playerRef.current?.playVideo();
+    }
   };
 
-  const handleSaveAndExit = async () => {
-    clearTimeout(pauseTimerRef.current);
-    clearTimeout(quizTimerRef.current);
-    accumulatePlaytime();
-    setSaving(true);
-
-    const minutesStudied = Math.round((Date.now() - sessionStartRef.current) / 60000);
-    if (minutesStudied > 0) trackStudyTime(topicId, minutesStudied);
-
-    const task = await generateMicroTask(topic?.title || '', demoMode);
-    saveMicroTask({ microTask: task, microTaskTopic: topicId, timestamp: Date.now() });
-    navigate('/goodbye');
-  };
-
-  // ── YouTube State Change ──────────────────────────────────────
   const onStateChange = (event) => {
-    if (event.data === 1) {
-      // Playing
+    if (event.data === 1) {         // playing
       playStartRef.current = Date.now();
-      setShowPausePopup(false);
-      clearTimeout(pauseTimerRef.current);
-      scheduleQuiz();
-    } else if (event.data === 2) {
-      // Paused
-      accumulatePlaytime();
+      scheduleNextQuiz();
+    } else if (event.data === 2) {  // paused
+      accumulatePlay();
       clearTimeout(quizTimerRef.current);
-      pauseTimerRef.current = setTimeout(() => setShowPausePopup(true), 120_000);
-    } else if (event.data === 0) {
-      // Ended
-      accumulatePlaytime();
+    } else if (event.data === 0) {  // ended
+      accumulatePlay();
       clearTimeout(quizTimerRef.current);
     }
   };
 
-  const handleStillHere = () => {
-    setShowPausePopup(false);
-    playerRef.current?.playVideo();
+  // Save & Exit
+  const handleSaveAndExit = async () => {
+    clearTimeout(quizTimerRef.current);
+    accumulatePlay();
+    setSaving(true);
+    const minutesStudied = Math.round((Date.now() - sessionStart.current) / 60000);
+    if (minutesStudied > 0) trackStudyTime?.(topicId, minutesStudied);
+    const task = await generateMicroTask(topic.title, demoMode);
+    saveMicroTask({ microTask: task, microTaskTopic: topic.title, microTaskTimestamp: Date.now() });
+    navigate('/goodbye');
   };
 
-  if (!topic) return null;
-
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden pb-24" style={{ background: '#050b18' }}>
-
+    <div style={{ background: '#0a0a0a', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {saving && (
-        <div className="absolute inset-0 z-50 bg-black/80 flex flex-col items-center justify-center">
-          <Loader2 className="w-12 h-12 text-indigo-400 animate-spin mb-4" />
-          <p className="text-white font-bold text-lg">Saving session...</p>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: 'rgba(0,0,0,0.9)' }}>
+          <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#7c3aed' }} />
+          <p style={{ color: '#f0f0f0', fontWeight: 600 }}>Saving your session...</p>
         </div>
       )}
 
-      {/* ── Quiz Overlay ── */}
+      {/* Loading question overlay */}
+      {loadingQuestion && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#7c3aed' }} />
+            <p style={{ color: '#a0a0a0', fontSize: '14px' }}>Generating quiz question...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Quiz Overlay */}
       <VideoQuizOverlay
         visible={quizVisible}
-        questions={quizQuestions}
+        question={currentQuestion}
         topicTitle={topic.title}
-        difficulty={difficulty}
-        onComplete={handleQuizComplete}
-        onResume={handleQuizResume}
+        demoMode={demoMode}
+        onDone={handleQuizDone}
       />
 
-      {/* ── Pause Popup ── */}
-      {showPausePopup && !saving && !quizVisible && (
-        <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="glass-card p-6 rounded-2xl max-w-sm w-full text-center">
-            <h3 className="text-xl font-bold mb-2 text-white">Still watching?</h3>
-            <p className="text-slate-300 mb-6">You've been paused for a while. Save your spot?</p>
-            <div className="flex flex-col gap-3">
-              <button onClick={handleStillHere}
-                className="w-full gradient-primary text-white font-bold py-3 rounded-xl">
-                I'm Still Here
-              </button>
-              <button onClick={handleSaveAndExit}
-                className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition">
-                Save & Exit
-              </button>
+      {/* Header */}
+      <header style={{ background: '#111', borderBottom: '1px solid #1f1f1f', padding: '12px 16px' }}>
+        <div style={{ maxWidth: '480px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button onClick={() => navigate('/dashboard')}
+              style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '10px', padding: '8px', cursor: 'pointer' }}>
+              <ArrowLeft style={{ width: '18px', height: '18px', color: '#f0f0f0' }} />
+            </button>
+            <div>
+              <div style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '15px' }}>{topic.title}</div>
+              <div style={{ color: '#7c3aed', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Interrupt {interruptCount}/{MAX_INTERRUPTS}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ── Header ── */}
-      <header className="w-full z-10 p-4 flex items-center justify-between glass-navbar">
-        <div className="flex items-center">
-          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 transition mr-3">
-            <ArrowLeft className="w-5 h-5 text-white" />
-          </button>
-          <div>
-            <h2 className="font-bold text-white leading-tight">{topic.title}</h2>
-            <span className="text-xs text-indigo-400 uppercase font-bold tracking-wider">Learning Module</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Quiz round indicator */}
-          {quizRound > 0 && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
-              style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <Brain className="w-3 h-3" /> Round {quizRound}
-            </div>
-          )}
           <button onClick={handleSaveAndExit}
-            className="flex items-center text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg transition">
-            <LogOut className="w-4 h-4 mr-2" /> Exit
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: '10px', padding: '8px 14px', cursor: 'pointer', color: '#a0a0a0', fontSize: '13px', fontWeight: 500 }}>
+            <LogOut style={{ width: '14px', height: '14px' }} /> Save & Exit
           </button>
         </div>
       </header>
 
-      {/* ── Video ── */}
-      <div className="flex-1 w-full flex flex-col max-w-4xl mx-auto p-4 space-y-5">
-        <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-800 aspect-video w-full bg-black relative">
+      {/* Video */}
+      <div style={{ maxWidth: '480px', margin: '0 auto', width: '100%', padding: '16px' }}>
+        <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid #1f1f1f', aspectRatio: '16/9', background: '#000' }}>
           <YouTube
             videoId={topic.videoId}
-            opts={{ height: '100%', width: '100%', playerVars: { autoplay: 0, rel: 0, modestbranding: 1 } }}
-            className="w-full h-full"
+            opts={{ height: '100%', width: '100%', playerVars: { autoplay: 0, rel: 0, modestbranding: 1, enablejsapi: 1 } }}
+            style={{ width: '100%', height: '100%' }}
             onReady={e => { playerRef.current = e.target; }}
             onStateChange={onStateChange}
           />
         </div>
 
-        {/* Info banner */}
-        <div className="flex items-center gap-3 p-4 rounded-2xl"
-          style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
-          <Brain className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-indigo-300">Adaptive Learning Active</p>
-            <p className="text-xs text-slate-400 mt-0.5">
-              A fill-in-the-blank quiz will appear every {demoMode ? '30 seconds' : '10 minutes'} of playback to reinforce what you're watching.
-            </p>
-          </div>
-          <span className="badge ml-auto" style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
-            {difficulty}
-          </span>
-        </div>
-
-        {/* Quiz CTA */}
-        <div className="bg-slate-900/50 rounded-2xl p-5 border border-slate-800/80">
-          <h3 className="text-lg font-bold mb-1 text-white">Ready to test your knowledge?</h3>
-          <p className="text-slate-400 text-sm mb-4">Take the full module quiz to unlock the next topic and earn XP.</p>
-          <button onClick={() => navigate(`/quiz/${topic.id}`)}
-            className="w-full gradient-primary hover:opacity-90 text-white font-bold py-4 rounded-xl transition-all glow-primary">
-            Start Module Quiz → +150 XP
-          </button>
+        {/* Info */}
+        <div style={{ marginTop: '12px', padding: '12px 16px', borderRadius: '12px', background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
+          <p style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
+            🧠 A fill-in-the-blank question will appear every <strong style={{ color: '#a78bfa' }}>90 seconds</strong> of playback.
+            After <strong style={{ color: '#a78bfa' }}>3 questions</strong>, you'll get a personalized session summary.
+          </p>
         </div>
       </div>
     </div>

@@ -1,106 +1,161 @@
-import React, { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
-import { Brain, Zap, Coffee, ArrowRight } from 'lucide-react';
+import { generateOverloadedResponse, generateBoredChallenge } from '../services/ClaudeAPI';
+import { Loader2 } from 'lucide-react';
+
+/**
+ * Spec-exact cognitive state detection:
+ * OVERLOADED: avgTimeToFirstKeypress > 5000ms OR totalBackspaceCount > 5 OR correctAnswers < 2
+ * BORED:      avgTimeToFirstKeypress < 1500ms AND correctAnswers === 3 AND totalBackspaceCount === 0
+ * FLOW:       everything else
+ */
+function detectCognitiveState(data, forceDemoState) {
+  if (forceDemoState) return forceDemoState;
+  if (!data || data.length === 0) return 'flow';
+
+  const avgTime    = data.reduce((s, d) => s + (d.timeToFirstKeypress || 0), 0) / data.length;
+  const backspaces = data.reduce((s, d) => s + (d.backspaceCount || 0), 0);
+  const correct    = data.filter(d => d.correct).length;
+
+  if (avgTime > 5000 || backspaces > 5 || correct < 2) return 'overloaded';
+  if (avgTime < 1500 && correct === data.length && backspaces === 0) return 'bored';
+  return 'flow';
+}
+
+const STATE_CONFIG = {
+  overloaded: { badge: '🧠 Overloaded', badgeClass: 'badge-overloaded', heading: "Let's slow down.", color: '#ef4444' },
+  bored:      { badge: '⚡ Too Easy',   badgeClass: 'badge-bored',      heading: "You've got this. Go deeper.", color: '#f59e0b' },
+  flow:       { badge: '🔥 Flow State', badgeClass: 'badge-flow',       heading: "You're in the zone.", color: '#10b981' },
+};
 
 export default function Summary() {
-  const navigate = useNavigate();
-  const { sessionData, profile } = useAppContext();
+  const navigate  = useNavigate();
+  const location  = useLocation();
+  const { unlockTopic, dynamicTopics, completeTopic, recordQuizScore } = useAppContext();
 
-  // Calculate Cognitive State
-  const cognitiveState = useMemo(() => {
-    if (!sessionData || !sessionData.metrics || sessionData.metrics.length === 0) return 'unknown';
-    
-    const m = sessionData.metrics;
-    
-    // Averages
-    const avgTime = m.reduce((acc, curr) => acc + curr.timeTaken, 0) / m.length;
-    const avgBackspaces = m.reduce((acc, curr) => acc + curr.backspaces, 0) / m.length;
-    const correctCount = m.filter(curr => curr.correct).length;
-    
-    // Logic for prototype
-    if (avgTime > 15000 && avgBackspaces > 10 && correctCount < 2) {
-      return 'overloaded';
-    } else if (avgTime < 5000 && correctCount === 3) {
-      return 'bored'; // Too easy
-    } else {
-      return 'flow';
+  const { behavioralData = [], topicId, topicTitle = '', demoMode, forceDemoState } = location.state || {};
+
+  const [state, setState]       = useState(null);
+  const [content, setContent]   = useState('');
+  const [loading, setLoading]   = useState(true);
+
+  const cfg = state ? STATE_CONFIG[state] : null;
+
+  // Stats
+  const correct    = behavioralData.filter(d => d.correct).length;
+  const backspaces = behavioralData.reduce((s, d) => s + (d.backspaceCount || 0), 0);
+  const reExplains = behavioralData.reduce((s, d) => s + (d.reExplanations || 0), 0);
+  const avgMs      = behavioralData.length
+    ? Math.round(behavioralData.reduce((s, d) => s + (d.timeToFirstKeypress || 0), 0) / behavioralData.length)
+    : 0;
+
+  useEffect(() => {
+    if (!location.state) { navigate('/dashboard'); return; }
+
+    const detected = detectCognitiveState(behavioralData, forceDemoState);
+    setState(detected);
+
+    // Record quiz score
+    const score = Math.round((correct / Math.max(behavioralData.length, 1)) * 100);
+    if (topicId) recordQuizScore?.(topicId, score);
+
+    // Fetch AI content
+    (async () => {
+      setLoading(true);
+      try {
+        if (detected === 'overloaded') {
+          const text = await generateOverloadedResponse(topicTitle, demoMode);
+          setContent(text);
+        } else if (detected === 'bored') {
+          const text = await generateBoredChallenge(topicTitle, demoMode);
+          setContent(text);
+        }
+      } catch { setContent(''); }
+      setLoading(false);
+    })();
+  }, []);
+
+  const handleNextTopic = () => {
+    // Unlock next topic
+    if (topicId && dynamicTopics) {
+      const idx = dynamicTopics.findIndex(t => t.id === topicId);
+      if (idx >= 0) {
+        completeTopic?.(topicId);
+        if (idx < dynamicTopics.length - 1) unlockTopic?.(dynamicTopics[idx + 1].id);
+      }
     }
-  }, [sessionData]);
-
-  if (!sessionData) {
     navigate('/dashboard');
-    return null;
-  }
-
-  const renderStateContent = () => {
-    switch (cognitiveState) {
-      case 'overloaded':
-        return {
-          icon: <Coffee className="w-12 h-12 text-yellow-500 mb-4" />,
-          title: "Take a Breather",
-          message: "You've absorbed a lot of new concepts. We noticed some hesitation during the checks. Take a 5-minute break before jumping into the next topic to let the knowledge settle.",
-          color: "text-yellow-500",
-          bg: "bg-yellow-500/10"
-        };
-      case 'bored':
-        return {
-          icon: <Zap className="w-12 h-12 text-primary mb-4" />,
-          title: "Speed Demon",
-          message: "You're breezing through this material! We'll adjust the difficulty of future quizzes to keep you engaged and challenged.",
-          color: "text-primary",
-          bg: "bg-primary/10"
-        };
-      case 'flow':
-      default:
-        return {
-          icon: <Brain className="w-12 h-12 text-accent mb-4" />,
-          title: "In the Zone",
-          message: "Perfect rhythm! Your response times and accuracy show you're in a deep state of flow. Keep this momentum going!",
-          color: "text-accent",
-          bg: "bg-accent/10"
-        };
-    }
   };
 
-  const content = renderStateContent();
+  const handleTryAgain = () => navigate(`/learning/${topicId}`);
+
+  if (!state) return null;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background to-surface">
-      <div className="glass-panel rounded-2xl p-8 w-full max-w-md text-center animate-fade-in-up">
-        
-        <div className={`flex flex-col items-center p-6 rounded-xl ${content.bg} mb-8`}>
-          {content.icon}
-          <h1 className={`text-2xl font-bold mb-2 ${content.color}`}>{content.title}</h1>
-          <p className="text-slate-300 leading-relaxed">{content.message}</p>
-        </div>
+    <div style={{ background: '#0a0a0a', minHeight: '100vh' }}>
+      <div className="page-container" style={{ justifyContent: 'center', paddingTop: '40px', paddingBottom: '40px' }}>
+        <div className="animate-fade-in-up">
 
-        <div className="bg-slate-800/50 rounded-xl p-4 mb-8">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Session Stats</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <div className="text-2xl font-bold text-white">{sessionData.metrics.length}</div>
-              <div className="text-xs text-slate-500">Checks</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-accent">{sessionData.metrics.filter(m => m.correct).length}</div>
-              <div className="text-xs text-slate-500">Correct</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-secondary">
-                {Math.round(sessionData.metrics.reduce((acc, curr) => acc + curr.timeTaken, 0) / 1000)}s
+          {/* Badge */}
+          <div className="flex justify-center mb-4">
+            <span className={`badge ${cfg.badgeClass}`} style={{ fontSize: '14px', padding: '8px 20px' }}>
+              {cfg.badge}
+            </span>
+          </div>
+
+          {/* Heading */}
+          <h1 style={{ fontSize: '26px', fontWeight: 700, color: '#f0f0f0', textAlign: 'center', marginBottom: '8px' }}>
+            {cfg.heading}
+          </h1>
+          <p style={{ color: '#666', textAlign: 'center', fontSize: '14px', marginBottom: '28px' }}>
+            {topicTitle}
+          </p>
+
+          {/* Stats */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+            {[
+              { label: 'Correct', value: `${correct}/${behavioralData.length}`, color: '#10b981' },
+              { label: 'Backspaces', value: backspaces, color: '#f59e0b' },
+              { label: 'Re-explanations', value: reExplains, color: '#a78bfa' },
+              { label: 'Avg response', value: `${(avgMs / 1000).toFixed(1)}s`, color: '#60a5fa' },
+            ].map(s => (
+              <div key={s.label} className="card" style={{ textAlign: 'center', padding: '14px' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: s.color }}>{s.value}</div>
+                <div style={{ fontSize: '11px', color: '#555', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
               </div>
-              <div className="text-xs text-slate-500">Total Time</div>
+            ))}
+          </div>
+
+          {/* AI Content box */}
+          {(state === 'overloaded' || state === 'bored') && (
+            <div style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px', background: `${cfg.color}0f`, border: `1px solid ${cfg.color}30` }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: cfg.color, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {state === 'overloaded' ? '💡 Real-World Analogy' : '🎯 Next Challenge'}
+              </div>
+              {loading
+                ? <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" style={{ color: cfg.color }} /><span style={{ color: '#888', fontSize: '14px' }}>Loading...</span></div>
+                : <p style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.65' }}>{content}</p>}
             </div>
+          )}
+
+          {/* Flow state message */}
+          {state === 'flow' && (
+            <div style={{ padding: '16px', borderRadius: '12px', marginBottom: '20px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'center' }}>
+              <p style={{ color: '#34d399', fontSize: '15px', fontWeight: 500 }}>
+                Perfect rhythm. Your responses were consistent and accurate. Keep this momentum going!
+              </p>
+            </div>
+          )}
+
+          {/* CTA buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {state === 'overloaded'
+              ? <button onClick={handleTryAgain} className="btn-primary">Try Again →</button>
+              : <button onClick={handleNextTopic} className="btn-primary">Next Topic →</button>}
+            <button onClick={() => navigate('/dashboard')} className="btn-secondary">Back to Dashboard</button>
           </div>
         </div>
-
-        <button 
-          onClick={() => navigate('/dashboard')}
-          className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white font-bold py-4 rounded-lg flex items-center justify-center transition-all shadow-lg"
-        >
-          Return to Roadmap <ArrowRight className="ml-2 w-5 h-5" />
-        </button>
       </div>
     </div>
   );
