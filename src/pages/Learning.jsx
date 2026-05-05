@@ -9,20 +9,21 @@ import { ArrowLeft, Play, LogOut, Loader2 } from 'lucide-react';
 export default function Learning() {
   const { topicId } = useParams();
   const navigate = useNavigate();
-  const { demoMode, dynamicTopics, saveMicroTask } = useAppContext();
+  const { demoMode, dynamicTopics, saveMicroTask, trackStudyTime } = useAppContext();
   
   const [saving, setSaving] = useState(false);
   const [showPausePopup, setShowPausePopup] = useState(false);
+  const sessionStart = useRef(Date.now());
   
   const playerRef = useRef(null);
   const pauseTimerRef = useRef(null);
 
-  const topicsToSearch = demoMode ? PYTHON_TOPICS : (dynamicTopics || PYTHON_TOPICS);
+  const topicsToSearch = dynamicTopics || PYTHON_TOPICS;
   const topic = topicsToSearch.find(t => t.id === topicId);
 
   useEffect(() => {
     if (!topic) {
-      navigate('/roadmap');
+      navigate('/dashboard');
     }
   }, [topic, navigate]);
 
@@ -35,6 +36,10 @@ export default function Learning() {
   const handleSaveAndExit = async () => {
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     setSaving(true);
+
+    // Track study time
+    const minutesStudied = Math.round((Date.now() - sessionStart.current) / 60000);
+    if (minutesStudied > 0) trackStudyTime(topic.id, minutesStudied);
     
     const task = await generateMicroTask(topic.title, demoMode);
     
@@ -106,7 +111,7 @@ export default function Learning() {
       {/* Header */}
       <header className="w-full z-10 p-4 flex items-center justify-between bg-slate-900 border-b border-slate-800">
         <div className="flex items-center">
-          <button onClick={() => navigate('/roadmap')} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 transition mr-4">
+          <button onClick={() => navigate('/dashboard')} className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 transition mr-4">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
           <div>

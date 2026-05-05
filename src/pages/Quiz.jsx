@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAppContext } from '../context/AppContext';
 import { generateQuiz, generateMicroTask } from '../services/ClaudeAPI';
 import { TOPICS as PYTHON_TOPICS } from '../data/topics';
+import { getRoadmapForTopic } from '../data/roadmaps';
 import { Loader2, ArrowRight, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function Quiz() {
   const { topicId } = useParams();
   const navigate = useNavigate();
-  const { demoMode, dynamicTopics, saveSession, saveMicroTask } = useAppContext();
+  const { demoMode, dynamicTopics, saveSession, saveMicroTask, unlockTopic, completeTopic, recordQuizScore } = useAppContext();
   
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,12 +22,12 @@ export default function Quiz() {
   const questionStartTime = useRef(Date.now());
   const metrics = useRef([]);
 
-  const topicsToSearch = demoMode ? PYTHON_TOPICS : (dynamicTopics || PYTHON_TOPICS);
+  const topicsToSearch = dynamicTopics || getRoadmapForTopic('Web Dev');
   const topic = topicsToSearch.find(t => t.id === topicId);
 
   useEffect(() => {
     if (!topic) {
-      navigate('/roadmap');
+      navigate('/dashboard');
       return;
     }
 
@@ -79,9 +80,23 @@ export default function Quiz() {
       setSelectedOption(null);
       questionStartTime.current = Date.now();
     } else {
-      // Finish Quiz
+      // Calculate score
+      const correctCount = metrics.current.filter(m => m.correct).length;
+      const score = Math.round((correctCount / questions.length) * 100);
+
+      // Record in analytics
+      recordQuizScore(topic.id, score);
+
+      // Mark topic complete + unlock next
+      completeTopic(topic.id);
+      const currentIdx = topicsToSearch.findIndex(t => t.id === topic.id);
+      if (currentIdx >= 0 && currentIdx < topicsToSearch.length - 1) {
+        unlockTopic(topicsToSearch[currentIdx + 1].id);
+      }
+
       saveSession({
         topicId: topic.id,
+        score,
         metrics: metrics.current,
         totalBackspaces: backspaceCount.current,
         completedAt: new Date().toISOString()

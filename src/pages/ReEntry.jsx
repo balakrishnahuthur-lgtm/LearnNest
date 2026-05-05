@@ -10,7 +10,7 @@ export default function ReEntry() {
 
   // If no partial session, go to roadmap
   if (!sessionData || !sessionData.partial) {
-    navigate('/roadmap');
+    navigate('/dashboard');
     return null;
   }
 
@@ -42,10 +42,10 @@ export default function ReEntry() {
         </button>
         
         <button 
-          onClick={() => navigate('/roadmap')}
+          onClick={() => navigate('/dashboard')}
           className="mt-4 text-sm text-slate-400 hover:text-white transition"
         >
-          No thanks, take me to the roadmap
+          No thanks, take me to the dashboard
         </button>
       </div>
     </div>

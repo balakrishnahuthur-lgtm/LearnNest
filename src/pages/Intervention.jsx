@@ -35,7 +35,7 @@ export default function Intervention() {
 
   useEffect(() => {
     if (!topic) {
-      navigate('/roadmap');
+      navigate('/dashboard');
       return;
     }
 
@@ -110,7 +110,7 @@ export default function Intervention() {
         )}
 
         <button 
-          onClick={() => navigate('/roadmap')}
+          onClick={() => navigate('/dashboard')}
           className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90 text-white font-bold py-4 rounded-lg flex items-center justify-center transition-all shadow-lg"
         >
           Return to Roadmap <ArrowRight className="ml-2 w-5 h-5" />
