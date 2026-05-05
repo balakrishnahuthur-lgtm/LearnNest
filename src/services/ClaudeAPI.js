@@ -213,7 +213,53 @@ export const generateQuiz = async (topicName, demoMode = false) => {
   } catch { return [{ question: 'API Error', options: ['A','B','C','D'], correct: 0 }]; }
 };
 
+// ── 9. End-of-module quiz (mandatory, 5–10 fill-in-blank questions) ──
+/**
+ * Generates a comprehensive quiz from ALL keyTopics in the module.
+ * @param {string}   topicTitle  - e.g. "HTML Fundamentals"
+ * @param {string[]} keyTopics   - all topics covered in the video
+ * @param {number}   count       - how many questions to generate (5-10)
+ * @param {boolean}  demoMode
+ * @returns {Promise<Array<{prompt:string, answer:string, hint:string}>>}
+ */
+export const generateModuleQuiz = async (topicTitle, keyTopics = [], count = 7, demoMode = false) => {
+  // Demo fallback — use quizBank
+  if (demoMode || !anthropic) {
+    const { getQuestions } = await import('../data/quizBank.js');
+    const qs = getQuestions(topicTitle, 'beginner', count);
+    return new Promise(r => setTimeout(() => r(qs), 700));
+  }
+
+  const topicList = keyTopics.length
+    ? keyTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')
+    : topicTitle;
+
+  try {
+    const text = await call(
+      `You are an educational AI generating a mandatory end-of-module quiz.
+Rules:
+- Generate exactly ${count} fill-in-the-blank questions
+- Each question MUST test a SPECIFIC concept from the provided topic list
+- Each blank is represented as _____
+- Keep answers SHORT (1-4 words max)
+- Return ONLY valid JSON array, no extra text
+Format: [{"prompt":"sentence with _____","answer":"short answer","hint":"one-line hint"}]`,
+      `Module: "${topicTitle}"\nConcepts covered:\n${topicList}\n\nGenerate ${count} fill-in-the-blank questions, one per concept from this list.`,
+      1200
+    );
+    const m = text.match(/\[[\s\S]*\]/);
+    const parsed = JSON.parse(m ? m[0] : text);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    throw new Error('Bad format');
+  } catch (e) {
+    // Fallback to quizBank
+    const { getQuestions } = await import('../data/quizBank.js');
+    return getQuestions(topicTitle, 'beginner', count);
+  }
+};
+
 export { DEMO };
+
 
 // ── Legacy alias for Intervention.jsx ────────────────────────────
 export const generateIntervention = (state, topic, demoMode) =>
