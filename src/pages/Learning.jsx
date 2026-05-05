@@ -5,31 +5,45 @@ import { useAppContext } from '../context/AppContext';
 import { generateInlineQuestion, generateMicroTask } from '../services/ClaudeAPI';
 import { getRoadmapForTopic } from '../data/roadmaps';
 import VideoQuizOverlay from '../components/VideoQuizOverlay';
-import { ArrowLeft, LogOut, Loader2 } from 'lucide-react';
+import { ArrowLeft, LogOut, Loader2, SkipForward } from 'lucide-react';
 
-const QUIZ_INTERVAL_MS   = 90_000;  // 90 seconds of playback
-const MAX_INTERRUPTS     = 3;
+const MAX_INTERRUPTS = 3;
+
+// Random interval: 60–150s normal, 10–25s demo
+const randomIntervalMs = (demo) =>
+  demo
+    ? Math.floor(Math.random() * 15_000) + 10_000   // 10–25 seconds
+    : Math.floor(Math.random() * 90_000) + 60_000;  // 60–150 seconds
+
+// If user seeks forward more than this many seconds, trigger quiz
+const SKIP_THRESHOLD_SEC = 8;
+// Poll interval for seek detection
+const POLL_MS = 1_500;
 
 export default function Learning() {
   const { topicId } = useParams();
   const navigate    = useNavigate();
   const { demoMode, dynamicTopics, saveMicroTask, trackStudyTime } = useAppContext();
 
-  const [saving, setSaving]             = useState(false);
-  const [quizVisible, setQuizVisible]   = useState(false);
+  const [saving, setSaving]           = useState(false);
+  const [quizVisible, setQuizVisible] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [interruptCount, setInterruptCount]   = useState(0);
   const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [skipBadge, setSkipBadge]     = useState(false); // flash "caught skipping!" badge
 
-  // Behavioral data collected across all 3 interrupts
+  // Behavioral data across all interrupts
   const behavioralData = useRef([]);
 
-  // Playback tracking
+  // Timers & tracking
   const playerRef       = useRef(null);
   const quizTimerRef    = useRef(null);
+  const seekPollRef     = useRef(null);
   const playStartRef    = useRef(null);
   const playedMsRef     = useRef(0);
+  const lastPlayerTime  = useRef(0);
   const sessionStart    = useRef(Date.now());
+  const isQuizActive    = useRef(false); // prevent double-trigger
 
   const topicsToSearch = dynamicTopics || getRoadmapForTopic('Web Dev');
   const topic = topicsToSearch.find(t => t.id === topicId);
@@ -41,12 +55,13 @@ export default function Learning() {
   useEffect(() => {
     return () => {
       clearTimeout(quizTimerRef.current);
+      clearInterval(seekPollRef.current);
     };
   }, []);
 
   if (!topic) return null;
 
-  // ── Playback helpers ──────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────
   const accumulatePlay = () => {
     if (playStartRef.current) {
       playedMsRef.current += Date.now() - playStartRef.current;
@@ -56,63 +71,93 @@ export default function Learning() {
 
   const scheduleNextQuiz = () => {
     clearTimeout(quizTimerRef.current);
-    const remaining = Math.max(0, QUIZ_INTERVAL_MS - playedMsRef.current);
-    quizTimerRef.current = setTimeout(triggerQuiz, remaining);
+    const interval = randomIntervalMs(demoMode);
+    quizTimerRef.current = setTimeout(triggerQuiz, interval);
   };
 
+  const startSeekDetection = () => {
+    clearInterval(seekPollRef.current);
+    seekPollRef.current = setInterval(() => {
+      if (!playerRef.current || isQuizActive.current) return;
+      try {
+        const currentSec = playerRef.current.getCurrentTime();
+        const diff = currentSec - lastPlayerTime.current;
+        // diff > SKIP_THRESHOLD means user jumped forward
+        if (diff > SKIP_THRESHOLD_SEC) {
+          clearInterval(seekPollRef.current);
+          clearTimeout(quizTimerRef.current);
+          setSkipBadge(true);
+          setTimeout(() => setSkipBadge(false), 2000);
+          triggerQuiz();
+        } else {
+          lastPlayerTime.current = currentSec;
+        }
+      } catch {/* player not ready */}
+    }, POLL_MS);
+  };
+
+  const stopSeekDetection = () => clearInterval(seekPollRef.current);
+
   const triggerQuiz = async () => {
+    if (isQuizActive.current) return;
+    isQuizActive.current = true;
     accumulatePlay();
     playerRef.current?.pauseVideo();
+    stopSeekDetection();
     setLoadingQuestion(true);
     const q = await generateInlineQuestion(topic.title, demoMode);
     setCurrentQuestion(q);
     setLoadingQuestion(false);
     setQuizVisible(true);
-    playedMsRef.current = 0; // reset for next interval
+    playedMsRef.current = 0;
   };
 
-  // Called when VideoQuizOverlay finishes
   const handleQuizDone = (signals) => {
+    isQuizActive.current = false;
     const newCount = interruptCount + 1;
     behavioralData.current = [...behavioralData.current, signals];
     setInterruptCount(newCount);
     setQuizVisible(false);
 
     if (newCount >= MAX_INTERRUPTS) {
-      // Navigate to summary with all behavioral data
-      const allData = behavioralData.current;
       navigate('/summary', {
         state: {
           topicId,
           topicTitle: topic.title,
-          behavioralData: allData,
+          behavioralData: behavioralData.current,
           demoMode,
-          // Force OVERLOADED in demo mode (spec requirement)
           forceDemoState: demoMode ? 'overloaded' : null,
         }
       });
     } else {
-      // Resume video and schedule next quiz
       playerRef.current?.playVideo();
     }
   };
 
   const onStateChange = (event) => {
-    if (event.data === 1) {         // playing
+    if (event.data === 1) {        // playing
       playStartRef.current = Date.now();
+      // Capture current time as baseline for seek detection
+      try { lastPlayerTime.current = playerRef.current.getCurrentTime(); } catch {}
       scheduleNextQuiz();
-    } else if (event.data === 2) {  // paused
+      startSeekDetection();
+    } else if (event.data === 2) { // paused
       accumulatePlay();
       clearTimeout(quizTimerRef.current);
-    } else if (event.data === 0) {  // ended
+      stopSeekDetection();
+    } else if (event.data === 0) { // ended
       accumulatePlay();
       clearTimeout(quizTimerRef.current);
+      stopSeekDetection();
+    } else if (event.data === 3) { // buffering (often means seeking started)
+      // Update lastPlayerTime so we detect the jump on next poll
+      try { lastPlayerTime.current = playerRef.current?.getCurrentTime() || 0; } catch {}
     }
   };
 
-  // Save & Exit
   const handleSaveAndExit = async () => {
     clearTimeout(quizTimerRef.current);
+    stopSeekDetection();
     accumulatePlay();
     setSaving(true);
     const minutesStudied = Math.round((Date.now() - sessionStart.current) / 60000);
@@ -124,6 +169,7 @@ export default function Learning() {
 
   return (
     <div style={{ background: '#0a0a0a', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
       {saving && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: 'rgba(0,0,0,0.9)' }}>
           <Loader2 className="w-10 h-10 animate-spin mb-4" style={{ color: '#7c3aed' }} />
@@ -131,17 +177,24 @@ export default function Learning() {
         </div>
       )}
 
-      {/* Loading question overlay */}
       {loadingQuestion && (
         <div className="fixed inset-0 z-40 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#7c3aed' }} />
-            <p style={{ color: '#a0a0a0', fontSize: '14px' }}>Generating quiz question...</p>
+            <p style={{ color: '#a0a0a0', fontSize: '14px' }}>Generating question...</p>
           </div>
         </div>
       )}
 
-      {/* Quiz Overlay */}
+      {/* Caught skipping badge */}
+      {skipBadge && (
+        <div className="fixed top-4 left-1/2 z-50 animate-fade-in-up"
+          style={{ transform: 'translateX(-50%)', background: '#7c3aed', borderRadius: '999px', padding: '8px 20px', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 20px rgba(124,58,237,0.5)' }}>
+          <SkipForward style={{ width: '14px', height: '14px', color: '#fff' }} />
+          <span style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>Caught skipping! 😏 Answer a question first.</span>
+        </div>
+      )}
+
       <VideoQuizOverlay
         visible={quizVisible}
         question={currentQuestion}
@@ -161,7 +214,7 @@ export default function Learning() {
             <div>
               <div style={{ color: '#f0f0f0', fontWeight: 600, fontSize: '15px' }}>{topic.title}</div>
               <div style={{ color: '#7c3aed', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Interrupt {interruptCount}/{MAX_INTERRUPTS}
+                {interruptCount}/{MAX_INTERRUPTS} questions answered
               </div>
             </div>
           </div>
@@ -184,11 +237,12 @@ export default function Learning() {
           />
         </div>
 
-        {/* Info */}
+        {/* Info banner */}
         <div style={{ marginTop: '12px', padding: '12px 16px', borderRadius: '12px', background: '#1a1a1a', border: '1px solid #2a2a2a' }}>
-          <p style={{ fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
-            🧠 A fill-in-the-blank question will appear every <strong style={{ color: '#a78bfa' }}>90 seconds</strong> of playback.
-            After <strong style={{ color: '#a78bfa' }}>3 questions</strong>, you'll get a personalized session summary.
+          <p style={{ fontSize: '13px', color: '#666', lineHeight: '1.6' }}>
+            🧠 Questions appear at <strong style={{ color: '#a78bfa' }}>random intervals</strong> while you watch.
+            Trying to skip? <strong style={{ color: '#a78bfa' }}>Expect a pop quiz.</strong>{' '}
+            After <strong style={{ color: '#a78bfa' }}>3 questions</strong>, you'll get your session summary.
           </p>
         </div>
       </div>
