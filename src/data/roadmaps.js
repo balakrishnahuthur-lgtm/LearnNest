@@ -1,91 +1,190 @@
-// Comprehensive roadmap database with real YouTube video IDs
-// Each topic has 8 modules with rich metadata
+// Roadmap database with keyTopics — what's actually covered in each video
+// keyTopics are time-ordered so we can pick context by playback position
 
 export const ROADMAP_DATABASE = {
   'Web Dev': [
-    { id: 'topic-0', title: 'How the Web Works', description: 'Understand HTTP, DNS, browsers, and how websites are served to users.', estimatedTime: '2h', difficulty: 'Beginner', videoId: 'hJHvdBlSxug' },
-    { id: 'topic-1', title: 'HTML Fundamentals', description: 'Master semantic HTML5 elements, forms, tables, and accessibility.', estimatedTime: '3h', difficulty: 'Beginner', videoId: 'pQN-pnXPaVg' },
-    { id: 'topic-2', title: 'CSS & Modern Layouts', description: 'Style websites using Flexbox, CSS Grid, animations, and custom properties.', estimatedTime: '4h', difficulty: 'Beginner', videoId: '1Rs2ND1ryYc' },
-    { id: 'topic-3', title: 'JavaScript Essentials', description: 'Learn variables, functions, arrays, objects, and control flow.', estimatedTime: '5h', difficulty: 'Intermediate', videoId: 'W6NZfCO5SIk' },
-    { id: 'topic-4', title: 'DOM Manipulation', description: 'Interact with webpage elements dynamically using JavaScript.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'y17RuWUpcgU' },
-    { id: 'topic-5', title: 'Async JavaScript', description: 'Promises, Async/Await, Fetch API — handle async operations like a pro.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'V_Kr9OSfDeU' },
-    { id: 'topic-6', title: 'Responsive Design', description: 'Build sites that adapt beautifully to all screen sizes with media queries.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'srvUrASNj0s' },
-    { id: 'topic-7', title: 'Deploy Your Website', description: 'Take your project live using GitHub Pages, Netlify, or Vercel.', estimatedTime: '2h', difficulty: 'Beginner', videoId: 'Bj4MwGXvNFY' },
+    { id: 'topic-0', title: 'How the Web Works', videoId: 'hJHvdBlSxug', difficulty: 'Beginner', estimatedTime: '2h',
+      description: 'Understand HTTP, DNS, browsers, and how websites are served.',
+      keyTopics: ['what happens when you type a URL', 'DNS resolution and IP addresses', 'HTTP request and response cycle', 'how browsers render HTML', 'what a web server does', 'client vs server explained', 'HTTPS and SSL certificates'] },
+    { id: 'topic-1', title: 'HTML Fundamentals', videoId: 'pQN-pnXPaVg', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'Master semantic HTML5 elements, forms, tables, and accessibility.',
+      keyTopics: ['HTML document structure and DOCTYPE', 'heading tags h1 to h6', 'paragraph and text formatting tags', 'anchor tags and hyperlinks with href', 'img tag and src attribute', 'lists: ul ol and li tags', 'HTML forms and input types', 'semantic tags: header nav main footer', 'HTML tables with tr td th'] },
+    { id: 'topic-2', title: 'CSS & Modern Layouts', videoId: '1Rs2ND1ryYc', difficulty: 'Beginner', estimatedTime: '4h',
+      description: 'Style websites using Flexbox, CSS Grid, animations.',
+      keyTopics: ['CSS selectors and specificity', 'box model: margin border padding content', 'color and background properties', 'typography: font-family font-size font-weight', 'Flexbox: display flex justify-content align-items', 'CSS Grid: grid-template-columns and rows', 'CSS variables with custom properties', 'media queries for responsive design', 'CSS transitions and animations'] },
+    { id: 'topic-3', title: 'JavaScript Essentials', videoId: 'W6NZfCO5SIk', difficulty: 'Intermediate', estimatedTime: '5h',
+      description: 'Learn variables, functions, arrays, objects, and control flow.',
+      keyTopics: ['var let and const declarations', 'data types: string number boolean null undefined', 'if else and ternary operators', 'for loops and while loops', 'functions: declaration and arrow functions', 'arrays: push pop map filter reduce', 'objects and dot notation', 'template literals with backticks', 'destructuring arrays and objects', 'ES6 spread and rest operators'] },
+    { id: 'topic-4', title: 'DOM Manipulation', videoId: 'y17RuWUpcgU', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Interact with webpage elements dynamically using JavaScript.',
+      keyTopics: ['selecting elements with querySelector', 'changing innerHTML and textContent', 'adding and removing CSS classes', 'creating elements with createElement', 'event listeners with addEventListener', 'click events and event objects', 'form input events and values', 'preventing default form submission'] },
+    { id: 'topic-5', title: 'Async JavaScript', videoId: 'V_Kr9OSfDeU', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Promises, Async/Await, Fetch API.',
+      keyTopics: ['what is asynchronous code', 'callbacks and callback hell', 'Promises: resolve reject and then catch', 'async and await keywords', 'fetch API to call REST endpoints', 'handling JSON responses with response.json()', 'error handling with try catch', 'Promise.all for parallel requests'] },
+    { id: 'topic-6', title: 'Responsive Design', videoId: 'srvUrASNj0s', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Build sites that adapt to all screen sizes.',
+      keyTopics: ['mobile-first design philosophy', 'viewport meta tag', 'media queries with min-width and max-width', 'fluid typography with rem and em', 'responsive images with max-width 100%', 'Flexbox for responsive layouts', 'CSS Grid auto-fit and minmax'] },
+    { id: 'topic-7', title: 'Deploy Your Website', videoId: 'Bj4MwGXvNFY', difficulty: 'Beginner', estimatedTime: '2h',
+      description: 'Take your project live using GitHub Pages or Netlify.',
+      keyTopics: ['Git init add commit push workflow', 'creating a GitHub repository', 'deploying with GitHub Pages', 'Netlify drag and drop deploy', 'custom domain names', 'environment variables in production'] },
   ],
+
   'Python': [
-    { id: 'topic-0', title: 'Python Fundamentals', description: 'Syntax, variables, data types, operators, and your first Python programs.', estimatedTime: '3h', difficulty: 'Beginner', videoId: '_uQrJ0TkZlc' },
-    { id: 'topic-1', title: 'Control Flow & Loops', description: 'Master if/else, for loops, while loops, and list comprehensions.', estimatedTime: '2h', difficulty: 'Beginner', videoId: 'rfscVS0vtbw' },
-    { id: 'topic-2', title: 'Functions & Modules', description: 'Write reusable code with functions, default args, *args, **kwargs, and imports.', estimatedTime: '3h', difficulty: 'Beginner', videoId: '9Os0o3wzS_I' },
-    { id: 'topic-3', title: 'Data Structures', description: 'Lists, dictionaries, sets, tuples — when to use which and how.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'W8KKm3b4oLc' },
-    { id: 'topic-4', title: 'Object-Oriented Python', description: 'Classes, objects, inheritance, encapsulation, and polymorphism.', estimatedTime: '4h', difficulty: 'Intermediate', videoId: 'JeznW_7DlB0' },
-    { id: 'topic-5', title: 'File I/O & Error Handling', description: 'Read/write files, handle exceptions, and work with JSON/CSV data.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'Uh2ebFW8OO0' },
-    { id: 'topic-6', title: 'APIs & External Libraries', description: 'Use pip, requests, and popular Python libraries to build real projects.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'tb8gHvYlCFs' },
-    { id: 'topic-7', title: 'Python Projects', description: 'Build real-world projects: web scraper, automation script, data analyzer.', estimatedTime: '5h', difficulty: 'Advanced', videoId: 'QRn26s8j8Vs' },
+    { id: 'topic-0', title: 'Python Fundamentals', videoId: '_uQrJ0TkZlc', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'Syntax, variables, data types, and your first Python programs.',
+      keyTopics: ['print function to output text', 'variables and assignment operator', 'string data type and quotes', 'integer and float numbers', 'boolean True and False', 'basic arithmetic operators', 'input function to get user input', 'type conversion with int str float', 'comments with hash symbol'] },
+    { id: 'topic-1', title: 'Control Flow & Loops', videoId: 'rfscVS0vtbw', difficulty: 'Beginner', estimatedTime: '2h',
+      description: 'Master if/else, for loops, while loops.',
+      keyTopics: ['if elif else conditionals', 'comparison operators == != < >', 'logical operators and or not', 'for loop with range function', 'iterating over a list with for loop', 'while loop and infinite loop danger', 'break to exit a loop', 'continue to skip an iteration', 'nested loops'] },
+    { id: 'topic-2', title: 'Functions & Modules', videoId: '9Os0o3wzS_I', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'Write reusable code with functions and imports.',
+      keyTopics: ['def keyword to define a function', 'function parameters and arguments', 'return statement', 'default parameter values', 'args and kwargs', 'scope: local vs global variables', 'import statement for modules', 'from module import specific function', 'creating your own module file'] },
+    { id: 'topic-3', title: 'Data Structures', videoId: 'W8KKm3b4oLc', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Lists, dictionaries, sets, tuples.',
+      keyTopics: ['list creation with square brackets', 'list indexing and slicing', 'list methods: append extend remove', 'list comprehension syntax', 'dictionary with key-value pairs', 'accessing dict values with keys', 'dict methods: keys values items', 'tuple immutability', 'set for unique values'] },
+    { id: 'topic-4', title: 'Object-Oriented Python', videoId: 'JeznW_7DlB0', difficulty: 'Intermediate', estimatedTime: '4h',
+      description: 'Classes, objects, inheritance.',
+      keyTopics: ['class keyword to define a class', '__init__ constructor method', 'self parameter in methods', 'creating objects from a class', 'instance attributes and methods', 'inheritance with parentheses', 'overriding parent methods', 'super() function', 'encapsulation with underscore convention'] },
+    { id: 'topic-5', title: 'File I/O & Error Handling', videoId: 'Uh2ebFW8OO0', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Read/write files, handle exceptions.',
+      keyTopics: ['open function with r w a modes', 'reading files with read and readlines', 'writing to files', 'with statement as context manager', 'try except block', 'except specific exception types', 'finally block', 'raising exceptions with raise', 'reading JSON with json module'] },
+    { id: 'topic-6', title: 'APIs & External Libraries', videoId: 'tb8gHvYlCFs', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Use pip and requests library.',
+      keyTopics: ['pip install to add packages', 'import requests library', 'requests.get to call an API', 'response.json() to parse data', 'API keys and headers', 'POST requests with json parameter', 'status codes: 200 404 500', 'environment variables for secrets'] },
+    { id: 'topic-7', title: 'Python Projects', videoId: 'QRn26s8j8Vs', difficulty: 'Advanced', estimatedTime: '5h',
+      description: 'Build real-world projects.',
+      keyTopics: ['project structure and file organization', 'web scraping with BeautifulSoup', 'automating tasks with scripts', 'working with CSV and spreadsheet data', 'building a CLI application', 'unit testing with pytest', 'packaging a Python project'] },
   ],
+
   'MERN': [
-    { id: 'topic-0', title: 'JavaScript ES6+ Mastery', description: 'Arrow functions, destructuring, spread/rest, modules — JS you need for MERN.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'NCwa_xi0Uuc' },
-    { id: 'topic-1', title: 'React Foundations', description: 'Components, JSX, props, state, and the virtual DOM explained clearly.', estimatedTime: '4h', difficulty: 'Intermediate', videoId: 'bMknfKXIFA8' },
-    { id: 'topic-2', title: 'React Hooks Deep Dive', description: 'useState, useEffect, useContext, useRef — modern React without class components.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'O6P86uwfdR0' },
-    { id: 'topic-3', title: 'Node.js & Express', description: 'Build a REST API from scratch with routing, middleware, and error handling.', estimatedTime: '4h', difficulty: 'Intermediate', videoId: 'Oe421EPjeBE' },
-    { id: 'topic-4', title: 'MongoDB & Mongoose', description: 'Schema design, CRUD operations, queries, and data modeling.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'ofme2o29ngU' },
-    { id: 'topic-5', title: 'JWT Authentication', description: 'Implement secure user login with JSON Web Tokens and bcrypt hashing.', estimatedTime: '3h', difficulty: 'Advanced', videoId: 'mbsmsi7l3r4' },
-    { id: 'topic-6', title: 'Connecting Frontend & Backend', description: 'Link React to Express with Axios, handle CORS, and manage API state.', estimatedTime: '3h', difficulty: 'Advanced', videoId: 'pKd0Rpw7O_k' },
-    { id: 'topic-7', title: 'Deploy Your MERN App', description: 'Ship to production on Render/Railway (backend) + Vercel (frontend).', estimatedTime: '2h', difficulty: 'Intermediate', videoId: '7CqJlxBYj-M' },
+    { id: 'topic-0', title: 'JavaScript ES6+ Mastery', videoId: 'NCwa_xi0Uuc', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Modern JS you need for MERN stack.',
+      keyTopics: ['let and const vs var', 'arrow function syntax', 'destructuring objects and arrays', 'spread operator with arrays and objects', 'rest parameters in functions', 'template literals', 'optional chaining with ?.', 'nullish coalescing with ??', 'ES modules import and export'] },
+    { id: 'topic-1', title: 'React Foundations', videoId: 'bMknfKXIFA8', difficulty: 'Intermediate', estimatedTime: '4h',
+      description: 'Components, JSX, props, state.',
+      keyTopics: ['what is React and virtual DOM', 'creating a component with function', 'JSX syntax rules', 'props to pass data to components', 'rendering a list with map and key', 'conditional rendering with ternary', 'useState hook for state', 'handling click events in React', 'lifting state up to parent'] },
+    { id: 'topic-2', title: 'React Hooks Deep Dive', videoId: 'O6P86uwfdR0', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'useState, useEffect, useContext, useRef.',
+      keyTopics: ['useState for local component state', 'useEffect for side effects', 'useEffect dependency array', 'cleanup function in useEffect', 'useRef for DOM references', 'useContext to read context', 'createContext and Provider', 'useCallback to memoize functions', 'useMemo for expensive calculations'] },
+    { id: 'topic-3', title: 'Node.js & Express', videoId: 'Oe421EPjeBE', difficulty: 'Intermediate', estimatedTime: '4h',
+      description: 'Build a REST API from scratch.',
+      keyTopics: ['Node.js runtime and npm', 'require vs import in Node', 'Express app setup', 'app.get app.post app.put app.delete routes', 'route parameters with colon syntax', 'req.body req.params req.query', 'middleware with app.use', 'express.json() to parse body', 'sending JSON response with res.json'] },
+    { id: 'topic-4', title: 'MongoDB & Mongoose', videoId: 'ofme2o29ngU', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Schema design, CRUD operations.',
+      keyTopics: ['what is a NoSQL document database', 'MongoDB Atlas cloud setup', 'mongoose.connect to link database', 'Schema definition with mongoose.Schema', 'Model creation with mongoose.model', 'creating documents with new Model()', 'Model.find to read documents', 'Model.findByIdAndUpdate', 'Model.findByIdAndDelete'] },
+    { id: 'topic-5', title: 'JWT Authentication', videoId: 'mbsmsi7l3r4', difficulty: 'Advanced', estimatedTime: '3h',
+      description: 'Secure login with JSON Web Tokens.',
+      keyTopics: ['password hashing with bcrypt', 'JWT structure: header payload signature', 'jwt.sign to create a token', 'jwt.verify to validate a token', 'sending token in Authorization header', 'Bearer token format', 'protecting routes with auth middleware', 'storing JWT in localStorage or cookies'] },
+    { id: 'topic-6', title: 'Connecting Frontend & Backend', videoId: 'pKd0Rpw7O_k', difficulty: 'Advanced', estimatedTime: '3h',
+      description: 'Link React to Express with Axios.',
+      keyTopics: ['CORS error and how to fix it', 'cors middleware in Express', 'axios.get and axios.post from React', 'environment variables with .env files', 'proxy setup in Vite or CRA', 'loading states in React during API calls', 'error handling for failed API calls'] },
+    { id: 'topic-7', title: 'Deploy Your MERN App', videoId: '7CqJlxBYj-M', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Ship to production on Render + Vercel.',
+      keyTopics: ['deploying Node.js API to Render', 'environment variables in Render dashboard', 'deploying React app to Vercel', 'connecting frontend to deployed backend URL', 'MongoDB Atlas IP whitelist for production', 'health check endpoint'] },
   ],
+
   'DSA': [
-    { id: 'topic-0', title: 'Big O & Complexity', description: 'Analyze time and space complexity — the foundation of all algorithm thinking.', estimatedTime: '2h', difficulty: 'Beginner', videoId: 'Mo4vesaut8g' },
-    { id: 'topic-1', title: 'Arrays & Strings', description: 'Two-pointer, sliding window, and other key patterns for array problems.', estimatedTime: '4h', difficulty: 'Beginner', videoId: '4C_igB8MKNE' },
-    { id: 'topic-2', title: 'Linked Lists', description: 'Singly/doubly linked lists, reversal, cycle detection, and merge sort.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'Hj_rA0dhr5s' },
-    { id: 'topic-3', title: 'Stacks & Queues', description: 'Implement and apply stacks, queues, and monotonic stacks.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'wjI1WNcIntg' },
-    { id: 'topic-4', title: 'Trees & Binary Search Trees', description: 'Tree traversals, BST operations, height/depth, and balanced trees.', estimatedTime: '4h', difficulty: 'Intermediate', videoId: 'fAAZixBEILs' },
-    { id: 'topic-5', title: 'Graphs & BFS/DFS', description: 'Graph representation, BFS, DFS, shortest path, and cycle detection.', estimatedTime: '4h', difficulty: 'Advanced', videoId: 'tWVWeAqZ0WU' },
-    { id: 'topic-6', title: 'Dynamic Programming', description: 'Memoization, tabulation, and classic DP patterns (knapsack, LCS, etc.).', estimatedTime: '5h', difficulty: 'Advanced', videoId: 'vYquumk4nXw' },
-    { id: 'topic-7', title: 'Interview Practice', description: 'Solve LeetCode patterns, mock interviews, and submission strategies.', estimatedTime: '6h', difficulty: 'Advanced', videoId: 'ZmMVDVRHPb8' },
+    { id: 'topic-0', title: 'Big O & Complexity', videoId: 'Mo4vesaut8g', difficulty: 'Beginner', estimatedTime: '2h',
+      description: 'Analyze time and space complexity.',
+      keyTopics: ['what is Big O notation', 'O(1) constant time complexity', 'O(n) linear time complexity', 'O(n^2) quadratic and nested loops', 'O(log n) with binary search', 'O(n log n) for merge sort', 'space complexity and memory', 'best average and worst case', 'dropping constants in Big O'] },
+    { id: 'topic-1', title: 'Arrays & Strings', videoId: '4C_igB8MKNE', difficulty: 'Beginner', estimatedTime: '4h',
+      description: 'Two-pointer, sliding window patterns.',
+      keyTopics: ['array indexing and O(1) access', 'two-pointer technique', 'sliding window pattern', 'prefix sum arrays', 'string reversal', 'palindrome checking', 'anagram detection', 'finding duplicates in array', 'kadanes algorithm for max subarray'] },
+    { id: 'topic-2', title: 'Linked Lists', videoId: 'Hj_rA0dhr5s', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Singly/doubly linked lists, cycle detection.',
+      keyTopics: ['node structure with value and next pointer', 'traversing a linked list', 'inserting at head and tail', 'deleting a node by value', 'reversing a linked list', 'detecting a cycle with slow fast pointers', 'finding middle of linked list', 'merging two sorted lists'] },
+    { id: 'topic-3', title: 'Stacks & Queues', videoId: 'wjI1WNcIntg', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Stacks, queues, and monotonic stacks.',
+      keyTopics: ['stack LIFO: push and pop', 'queue FIFO: enqueue and dequeue', 'implementing stack with array', 'valid parentheses problem', 'monotonic stack pattern', 'next greater element', 'BFS using a queue', 'deque double-ended queue'] },
+    { id: 'topic-4', title: 'Trees & Binary Search Trees', videoId: 'fAAZixBEILs', difficulty: 'Intermediate', estimatedTime: '4h',
+      description: 'Tree traversals, BST operations.',
+      keyTopics: ['tree node with left and right children', 'inorder traversal: left root right', 'preorder traversal: root left right', 'postorder traversal: left right root', 'level order BFS traversal', 'BST property: left less right greater', 'inserting into a BST', 'searching in a BST', 'tree height calculation'] },
+    { id: 'topic-5', title: 'Graphs & BFS/DFS', videoId: 'tWVWeAqZ0WU', difficulty: 'Advanced', estimatedTime: '4h',
+      description: 'Graph traversal, shortest path.',
+      keyTopics: ['adjacency list representation', 'adjacency matrix', 'BFS breadth first search with queue', 'DFS depth first search with stack or recursion', 'visited set to avoid cycles', 'connected components', 'detecting cycles in graphs', 'Dijkstra shortest path algorithm'] },
+    { id: 'topic-6', title: 'Dynamic Programming', videoId: 'vYquumk4nXw', difficulty: 'Advanced', estimatedTime: '5h',
+      description: 'Memoization, tabulation, classic DP patterns.',
+      keyTopics: ['overlapping subproblems', 'optimal substructure', 'top-down memoization with hashmap', 'bottom-up tabulation with array', 'Fibonacci with DP', '0-1 knapsack problem', 'longest common subsequence', 'coin change problem', 'house robber pattern'] },
+    { id: 'topic-7', title: 'Interview Practice', videoId: 'ZmMVDVRHPb8', difficulty: 'Advanced', estimatedTime: '6h',
+      description: 'LeetCode patterns and mock interviews.',
+      keyTopics: ['two sum with hashmap', 'binary search on sorted array', 'merge intervals', 'top K elements with heap', 'fast and slow pointers', 'backtracking template', 'greedy algorithms', 'interview communication strategy'] },
   ],
+
   'React': [
-    { id: 'topic-0', title: 'React Core Concepts', description: 'JSX, components, props, and the component lifecycle explained.', estimatedTime: '3h', difficulty: 'Beginner', videoId: 'bMknfKXIFA8' },
-    { id: 'topic-1', title: 'State & Event Handling', description: 'useState, event handlers, controlled inputs, and lifting state up.', estimatedTime: '3h', difficulty: 'Beginner', videoId: 'O6P86uwfdR0' },
-    { id: 'topic-2', title: 'useEffect & Side Effects', description: 'Data fetching, subscriptions, cleanup, and dependency arrays.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'UVhIMwHDS9k' },
-    { id: 'topic-3', title: 'React Router', description: 'Multi-page SPAs with React Router, nested routes, and URL params.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'Jppoj_4H8jU' },
-    { id: 'topic-4', title: 'Context API & Global State', description: 'Share state without prop drilling using useContext and createContext.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'lhMKvyLRWo0' },
-    { id: 'topic-5', title: 'Performance Optimization', description: 'useMemo, useCallback, React.memo, and lazy loading.', estimatedTime: '3h', difficulty: 'Advanced', videoId: 'qySZIzZvZOY' },
-    { id: 'topic-6', title: 'Forms & Validation', description: 'React Hook Form, Zod validation, and controlled vs uncontrolled inputs.', estimatedTime: '2h', difficulty: 'Intermediate', videoId: 'bU_eq8qyjic' },
-    { id: 'topic-7', title: 'Build & Deploy', description: 'Vite, production builds, and deploying React apps to Vercel/Netlify.', estimatedTime: '2h', difficulty: 'Beginner', videoId: 'XVhPShjvfv0' },
+    { id: 'topic-0', title: 'React Core Concepts', videoId: 'bMknfKXIFA8', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'JSX, components, props.',
+      keyTopics: ['React as a UI library', 'functional components', 'JSX is JavaScript with HTML syntax', 'passing props to child components', 'destructuring props', 'rendering conditional JSX', 'className instead of class in JSX', 'React fragments to avoid extra divs'] },
+    { id: 'topic-1', title: 'State & Event Handling', videoId: 'O6P86uwfdR0', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'useState, event handlers, controlled inputs.',
+      keyTopics: ['useState returns value and setter', 'calling setState triggers re-render', 'event handler functions in JSX', 'onClick onChange events', 'controlled input with value and onChange', 'updating object state with spread', 'updating array state with map filter'] },
+    { id: 'topic-2', title: 'useEffect & Side Effects', videoId: 'UVhIMwHDS9k', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Data fetching, cleanup, dependency arrays.',
+      keyTopics: ['useEffect runs after render', 'empty dependency array runs once on mount', 'dependency array controls when effect runs', 'cleanup function prevents memory leaks', 'fetching data inside useEffect', 'avoiding infinite loops in useEffect', 'useEffect for subscriptions and timers'] },
+    { id: 'topic-3', title: 'React Router', videoId: 'Jppoj_4H8jU', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Multi-page SPAs with React Router.',
+      keyTopics: ['BrowserRouter wraps entire app', 'Route component with path and element', 'Link instead of anchor tag', 'useNavigate hook for programmatic navigation', 'useParams to read URL parameters', 'nested routes', 'Navigate component for redirects'] },
+    { id: 'topic-4', title: 'Context API & Global State', videoId: 'lhMKvyLRWo0', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'Share state without prop drilling.',
+      keyTopics: ['prop drilling problem', 'createContext creates a context', 'Provider wraps components that need data', 'value prop on Provider', 'useContext hook to consume context', 'updating context with state'] },
+    { id: 'topic-5', title: 'Performance Optimization', videoId: 'qySZIzZvZOY', difficulty: 'Advanced', estimatedTime: '3h',
+      description: 'useMemo, useCallback, React.memo.',
+      keyTopics: ['unnecessary re-renders', 'React.memo to skip re-renders', 'useCallback memoizes functions', 'useMemo memoizes computed values', 'dependency arrays in useCallback and useMemo', 'React.lazy for code splitting', 'Suspense fallback component'] },
+    { id: 'topic-6', title: 'Forms & Validation', videoId: 'bU_eq8qyjic', difficulty: 'Intermediate', estimatedTime: '2h',
+      description: 'React Hook Form and validation.',
+      keyTopics: ['React Hook Form useForm hook', 'register function for inputs', 'handleSubmit wrapper', 'errors object for validation messages', 'required validation rule', 'pattern validation with regex', 'Controller for custom inputs'] },
+    { id: 'topic-7', title: 'Build & Deploy', videoId: 'XVhPShjvfv0', difficulty: 'Beginner', estimatedTime: '2h',
+      description: 'Vite builds and deploying to Vercel.',
+      keyTopics: ['npm run build creates production bundle', 'Vite vs Create React App', 'environment variables with VITE_ prefix', 'deploying to Vercel via GitHub', 'public folder for static assets'] },
   ],
+
   'Machine Learning': [
-    { id: 'topic-0', title: 'ML Fundamentals', description: 'Supervised vs unsupervised learning, training/testing, and model evaluation.', estimatedTime: '3h', difficulty: 'Beginner', videoId: 'ukzFI9rgwfU' },
-    { id: 'topic-1', title: 'Python for ML', description: 'NumPy, Pandas, and Matplotlib — the data science toolkit.', estimatedTime: '4h', difficulty: 'Beginner', videoId: 'LHBE0uhFjHk' },
-    { id: 'topic-2', title: 'Regression Algorithms', description: 'Linear regression, polynomial regression, and regularization.', estimatedTime: '3h', difficulty: 'Intermediate', videoId: 'NUXdtN1W1FE' },
-    { id: 'topic-3', title: 'Classification Algorithms', description: 'Logistic regression, decision trees, random forests, and SVMs.', estimatedTime: '4h', difficulty: 'Intermediate', videoId: 'l6sSCNsRFTI' },
-    { id: 'topic-4', title: 'Neural Networks Basics', description: 'Perceptrons, activation functions, backpropagation, and training.', estimatedTime: '4h', difficulty: 'Advanced', videoId: 'aircAruvnKk' },
-    { id: 'topic-5', title: 'Deep Learning with TensorFlow', description: 'Build and train neural networks using TensorFlow and Keras.', estimatedTime: '5h', difficulty: 'Advanced', videoId: 'tPYj3fFJGjk' },
-    { id: 'topic-6', title: 'Model Evaluation & Tuning', description: 'Cross-validation, hyperparameter tuning, and avoiding overfitting.', estimatedTime: '3h', difficulty: 'Advanced', videoId: 'fwY9Qv96DJw' },
-    { id: 'topic-7', title: 'ML Projects', description: 'Build end-to-end: image classifier, price predictor, or NLP model.', estimatedTime: '6h', difficulty: 'Advanced', videoId: 'i_LwzRVP7bg' },
+    { id: 'topic-0', title: 'ML Fundamentals', videoId: 'ukzFI9rgwfU', difficulty: 'Beginner', estimatedTime: '3h',
+      description: 'Supervised vs unsupervised learning.',
+      keyTopics: ['what is machine learning', 'supervised learning with labels', 'unsupervised learning without labels', 'training set and test set', 'features and labels', 'model training and prediction', 'overfitting and underfitting', 'accuracy precision recall'] },
+    { id: 'topic-1', title: 'Python for ML', videoId: 'LHBE0uhFjHk', difficulty: 'Beginner', estimatedTime: '4h',
+      description: 'NumPy, Pandas, Matplotlib.',
+      keyTopics: ['NumPy array vs Python list', 'array operations and broadcasting', 'Pandas DataFrame creation', 'reading CSV with pd.read_csv', 'DataFrame iloc and loc indexing', 'handling missing values with fillna', 'Matplotlib plt.plot and plt.show', 'seaborn for statistical plots'] },
+    { id: 'topic-2', title: 'Regression Algorithms', videoId: 'NUXdtN1W1FE', difficulty: 'Intermediate', estimatedTime: '3h',
+      description: 'Linear regression and regularization.',
+      keyTopics: ['linear regression best fit line', 'cost function mean squared error', 'gradient descent to minimize error', 'learning rate hyperparameter', 'polynomial regression for curves', 'L1 Lasso regularization', 'L2 Ridge regularization', 'R-squared score for evaluation'] },
+    { id: 'topic-3', title: 'Classification Algorithms', videoId: 'l6sSCNsRFTI', difficulty: 'Intermediate', estimatedTime: '4h',
+      description: 'Decision trees, random forests, SVMs.',
+      keyTopics: ['logistic regression for binary classification', 'sigmoid function output 0 to 1', 'decision tree split criteria', 'Gini impurity and entropy', 'random forest ensemble method', 'SVM hyperplane and margin', 'K-nearest neighbors algorithm'] },
+    { id: 'topic-4', title: 'Neural Networks Basics', videoId: 'aircAruvnKk', difficulty: 'Advanced', estimatedTime: '4h',
+      description: 'Perceptrons, backpropagation.',
+      keyTopics: ['neuron: weights bias and activation', 'hidden layers in a network', 'ReLU activation function', 'sigmoid for output layer', 'forward pass prediction', 'loss function cross-entropy', 'backpropagation with chain rule', 'gradient descent weight update'] },
+    { id: 'topic-5', title: 'Deep Learning with TensorFlow', videoId: 'tPYj3fFJGjk', difficulty: 'Advanced', estimatedTime: '5h',
+      description: 'Build neural networks with Keras.',
+      keyTopics: ['TensorFlow and Keras relationship', 'Sequential model building', 'Dense layer with units and activation', 'model.compile with optimizer and loss', 'model.fit for training', 'model.evaluate on test data', 'dropout layer to prevent overfitting', 'batch size and epochs'] },
+    { id: 'topic-6', title: 'Model Evaluation & Tuning', videoId: 'fwY9Qv96DJw', difficulty: 'Advanced', estimatedTime: '3h',
+      description: 'Cross-validation and hyperparameter tuning.',
+      keyTopics: ['k-fold cross validation', 'confusion matrix TP TN FP FN', 'precision and recall tradeoff', 'ROC curve and AUC score', 'GridSearchCV for hyperparameters', 'train validation test split', 'early stopping callback'] },
+    { id: 'topic-7', title: 'ML Projects', videoId: 'i_LwzRVP7bg', difficulty: 'Advanced', estimatedTime: '6h',
+      description: 'Build end-to-end ML projects.',
+      keyTopics: ['end-to-end project pipeline', 'data cleaning and preprocessing', 'feature engineering', 'model selection and comparison', 'saving model with joblib or pickle', 'Flask API to serve ML model', 'deploying ML model to cloud'] },
   ],
 };
 
 export const getRoadmapForTopic = (topic) => {
-  // Exact match
   if (ROADMAP_DATABASE[topic]) return ROADMAP_DATABASE[topic];
-
-  // Case-insensitive match
-  const key = Object.keys(ROADMAP_DATABASE).find(
-    k => k.toLowerCase() === topic?.toLowerCase()
-  );
+  const key = Object.keys(ROADMAP_DATABASE).find(k => k.toLowerCase() === topic?.toLowerCase());
   if (key) return ROADMAP_DATABASE[key];
-
-  // Partial match
   const partial = Object.keys(ROADMAP_DATABASE).find(
     k => k.toLowerCase().includes(topic?.toLowerCase()) || topic?.toLowerCase().includes(k.toLowerCase())
   );
-  if (partial) return ROADMAP_DATABASE[partial];
+  return ROADMAP_DATABASE[partial] || ROADMAP_DATABASE['Web Dev'];
+};
 
-  // Default fallback — Web Dev
-  return ROADMAP_DATABASE['Web Dev'];
+// Get topics the student has likely seen based on playback progress
+export const getTopicsSeenByNow = (keyTopics = [], currentTimeSec = 0, durationSec = 600) => {
+  if (!keyTopics.length) return keyTopics;
+  const ratio = Math.min(currentTimeSec / Math.max(durationSec, 1), 1);
+  const seenCount = Math.max(1, Math.ceil(ratio * keyTopics.length));
+  return keyTopics.slice(0, seenCount);
 };
 
 export const DIFFICULTY_COLORS = {
-  'Beginner': { bg: 'rgba(16,185,129,0.15)', text: '#10b981', border: 'rgba(16,185,129,0.3)' },
-  'Intermediate': { bg: 'rgba(99,102,241,0.15)', text: '#818cf8', border: 'rgba(99,102,241,0.3)' },
-  'Advanced': { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.3)' },
+  'Beginner':     { bg: 'rgba(16,185,129,0.15)',  text: '#10b981', border: 'rgba(16,185,129,0.3)' },
+  'Intermediate': { bg: 'rgba(99,102,241,0.15)',  text: '#818cf8', border: 'rgba(99,102,241,0.3)' },
+  'Advanced':     { bg: 'rgba(239,68,68,0.15)',   text: '#f87171', border: 'rgba(239,68,68,0.3)' },
 };

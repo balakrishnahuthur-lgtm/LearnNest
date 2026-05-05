@@ -69,20 +69,38 @@ export const generateRoadmap = async (topic, goal, demoMode = false) => {
   }
 };
 
-// ── 2. Generate inline fill-in-blank question ───────────────────
-export const generateInlineQuestion = async (topic, demoMode = false) => {
+// ── 2. Generate inline fill-in-blank question from VIDEO CONTENT ─
+/**
+ * @param {string}   topicTitle     - module title e.g. "HTML Fundamentals"
+ * @param {string[]} seenTopics     - topics the student has seen so far (from playback position)
+ * @param {number}   currentTimeSec - current playback position in seconds
+ * @param {boolean}  demoMode
+ */
+export const generateInlineQuestion = async (topicTitle, seenTopics = [], currentTimeSec = 0, demoMode = false) => {
   if (demoMode || !anthropic) {
     return new Promise(r => setTimeout(() => r(DEMO.question), 400));
   }
+
+  // Pick 3 recent topics the student just watched (last 3 are most fresh)
+  const recentTopics = seenTopics.slice(-3);
+  const timeLabel    = currentTimeSec < 60
+    ? `${Math.round(currentTimeSec)} seconds`
+    : `${Math.floor(currentTimeSec / 60)} minute${Math.floor(currentTimeSec / 60) !== 1 ? 's' : ''}`;
+
+  const topicContext = recentTopics.length
+    ? `The student just watched a video about "${topicTitle}". At the ${timeLabel} mark, the video has covered these specific concepts:\n${recentTopics.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nGenerate ONE fill-in-the-blank question that tests one of these EXACT concepts the student just saw. The blank must be represented as _____. Return only the question string.`
+    : `Generate ONE fill-in-the-blank question about "${topicTitle}". Use exactly ONE blank as _____. Return only the question string.`;
+
   try {
     return await call(
-      'You are an educational AI. Generate ONE fill-in-the-blank question about the topic. Use exactly ONE blank represented as _____. Return only the question string, no quotes.',
-      `Topic: ${topic}. Generate a fill-in-the-blank question that tests a core concept.`
+      'You are an educational AI creating inline quiz questions for a video lecture. The question MUST be directly about a specific concept from the video content provided. Make it concrete and specific — not generic.',
+      topicContext
     );
   } catch (e) {
     return DEMO.question;
   }
 };
+
 
 // ── 3. Check student answer (spec-exact) ───────────────────────
 export const checkAnswer = async (topic, question, answer, demoMode = false) => {

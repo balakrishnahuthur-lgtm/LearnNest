@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import YouTube from 'react-youtube';
 import { useAppContext } from '../context/AppContext';
 import { generateInlineQuestion, generateMicroTask } from '../services/ClaudeAPI';
-import { getRoadmapForTopic } from '../data/roadmaps';
+import { getRoadmapForTopic, getTopicsSeenByNow } from '../data/roadmaps';
 import VideoQuizOverlay from '../components/VideoQuizOverlay';
 import { ArrowLeft, LogOut, Loader2, SkipForward } from 'lucide-react';
 
@@ -105,7 +105,19 @@ export default function Learning() {
     playerRef.current?.pauseVideo();
     stopSeekDetection();
     setLoadingQuestion(true);
-    const q = await generateInlineQuestion(topic.title, demoMode);
+
+    // Get playback position to know what the student has seen
+    let currentTimeSec = 0;
+    let durationSec    = 600; // default 10min
+    try {
+      currentTimeSec = playerRef.current?.getCurrentTime?.() || 0;
+      durationSec    = playerRef.current?.getDuration?.()    || 600;
+    } catch {}
+
+    // Slice keyTopics based on how far into the video the student is
+    const seenTopics = getTopicsSeenByNow(topic.keyTopics || [], currentTimeSec, durationSec);
+
+    const q = await generateInlineQuestion(topic.title, seenTopics, currentTimeSec, demoMode);
     setCurrentQuestion(q);
     setLoadingQuestion(false);
     setQuizVisible(true);
